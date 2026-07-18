@@ -12,11 +12,11 @@ provider "google" {
 
   # Global labels automatically applied to all resources in Project A
   default_labels = {
-    Environment       = var.env_name_short
-    GitRepo           = "commit-hw"
-    Owner             = "DevOps"
-    DeliveryType      = "Terraform"
-    Project           = "CommIT HW - Project A"
+    delivery_type = "terraform"
+    environment   = "commit-dev"
+    git_repo      = "commit-hw"
+    owner         = "devops"
+    project       = "commit-hw-project-a"
   }
 }
 
@@ -29,11 +29,11 @@ provider "google" {
 
   # Global labels automatically applied to all resources in Project B
   default_labels = {
-    Environment       = var.env_name_short
-    GitRepo           = "commit-hw"
-    Owner             = "DevOps"
-    DeliveryType      = "Terraform"
-    Project           = "CommIT HW - Project B"
+    delivery_type = "terraform"
+    environment   = "commit-dev"
+    git_repo      = "commit-hw"
+    owner         = "devops"
+    project       = "commit-hw-project-b"
   }
 }
 
@@ -63,7 +63,7 @@ terraform {
 
     kubernetes = {
       source  = "hashicorp/kubernetes" # https://registry.terraform.io/providers/hashicorp/kubernetes/latest
-      version = ">= 2.30.0" 
+      version = ">= 2.10, < 3.0" 
     }
   }
 
