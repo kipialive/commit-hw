@@ -1,5 +1,5 @@
-gcp_project_a_id = "000000000000"
-gcp_project_b_id = "111111111111"
+gcp_project_a_id = "project-0895aaca-3d6c-4e15-b58"
+gcp_project_b_id = "supple-lock-502820-g3"
 
 ### Council Bluffs, Iowa, USA
 gcp_region  = "us-central1"
@@ -13,14 +13,19 @@ git_branch_env_name   = "main"
 ### VPC "A" CommIT - CIDR blocks/range ###
 ###### ###### ###### ###### ###### ###### 
 
-vpc_a_subnet_cidr = "10.0.1.0/24"
+vpc_a_subnet_cidr = "10.10.0.0/16"
 
 ###### ###### ###### ###### ###### ###### 
 ### VPC "B" CommIT - CIDR blocks/range ###
 ###### ###### ###### ###### ###### ###### 
 
-vpc_b_subnet_cidr     = "10.0.2.0/24"
-vpc_b_psc_nat_cidr    = "10.0.3.0/24"
+# Main subnet for GKE nodes
+vpc_b_subnet_cidr     = "10.20.0.0/16"
+
+# Noted: Moved outside of 10.20.0.0/16 to avoid overlapping subnets conflict
+vpc_b_psc_nat_cidr    = "10.30.0.0/24"
+
+# Using a dedicated non-overlapping block for the Regional Managed Proxy
 vpc_b_proxy_only_cidr = "10.129.0.0/23"
 
 ###### ###### ###### ###### ###### ###### 

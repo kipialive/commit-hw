@@ -1,11 +1,23 @@
 ## environments/commit-dev/main-0-provider.tf
-// Configure the GCP Provider
+
+################################################################################
+# GCP Providers Configuration
+################################################################################
 
 # Default provider for Project A (Public perimeter: Cloud Armor, External LB)
 provider "google" {
   project = var.gcp_project_a_id
   region  = var.gcp_region
   zone    = var.gcp_zone
+
+  # Global labels automatically applied to all resources in Project A
+  default_labels = {
+    Environment       = var.env_name_short
+    GitRepo           = "commit-hw"
+    Owner             = "DevOps"
+    DeliveryType      = "Terraform"
+    Project           = "CommIT HW - Project A"
+  }
 }
 
 # Alias provider for Project B (Internal perimeter: GKE, Internal LB)
@@ -14,9 +26,20 @@ provider "google" {
   project = var.gcp_project_b_id
   region  = var.gcp_region
   zone    = var.gcp_zone
+
+  # Global labels automatically applied to all resources in Project B
+  default_labels = {
+    Environment       = var.env_name_short
+    GitRepo           = "commit-hw"
+    Owner             = "DevOps"
+    DeliveryType      = "Terraform"
+    Project           = "CommIT HW - Project B"
+  }
 }
 
-// Validate right Terraform Version
+################################################################################
+# Terraform Settings & Required Providers
+################################################################################
 terraform {
   # Specifying a Required Terraform Version # > terraform version # https://developer.hashicorp.com/terraform/tutorials/configuration-language/versions
   required_version = ">= 1.13.0" # https://github.com/hashicorp/terraform
@@ -48,7 +71,7 @@ terraform {
   # The GCS bucket must be created manually before running `terraform init`.
   # GCS natively supports state locking out of the box.
   backend "gcs" {
-    bucket = "commit-hw-terraforme" # Replace with your actual GCS bucket name
+    bucket = "commit-hw-terraform" # Replace with your actual GCS bucket name
     prefix = "commit-dev/terraform.tfstate"
   }
 }
