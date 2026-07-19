@@ -69,7 +69,7 @@ resource "google_compute_region_network_endpoint_group" "traefik_psc_neg" {
   network               = module.vpc_a.network_self_link
 
   # Explicitly specify the subnetwork in Project A (required for custom mode VPCs)
-  subnetwork            = module.vpc_a.subnets["${var.gcp_region}/${var.env_name_short}-subnet-a"].self_link
+  subnetwork = module.vpc_a.subnets["${var.gcp_region}/${var.env_name_short}-subnet-a"].self_link
 
   # Link the NEG directly to the published Service Attachment URI in Project B
   psc_target_service = google_compute_service_attachment.traefik_psc_attachment.id
@@ -83,13 +83,17 @@ module "external_lb" {
   source  = "terraform-google-modules/lb-http/google"
   version = ">= 14.2.0"
 
+  depends_on = [
+    terraform_data.traefik_ilb_allow_global_access,
+  ]
+
   project = var.gcp_project_a_id
   name    = "${var.env_name_short}-external-lb"
 
   # Core Network Settings
   firewall_networks = []
   create_address    = true
-  
+
   # SSL & Frontend Configurations
   ssl                             = true
   managed_ssl_certificate_domains = local.list_domain_names
@@ -102,7 +106,7 @@ module "external_lb" {
       protocol    = "HTTP"
       port_name   = "http"
       description = "PSC dynamic backend routing to Traefik internal proxy"
-      
+
       # Bind the Cloud Armor policy to this specific backend routing path
       security_policy = google_compute_security_policy.cloud_armor_policy.self_link
 

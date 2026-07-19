@@ -40,14 +40,35 @@ data "google_compute_forwarding_rule" "traefik_ilb" {
   name     = local.traefik_forwarding_rule
 }
 
+# GKE owns the Traefik internal passthrough Network Load Balancer forwarding rule.
+# A global external Application Load Balancer with a PSC NEG requires this producer
+# forwarding rule to have allow_global_access enabled before backend creation.
+resource "terraform_data" "traefik_ilb_allow_global_access" {
+  input = {
+    forwarding_rule = local.traefik_forwarding_rule
+    project         = var.gcp_project_b_id
+    region          = var.gcp_region
+  }
+
+  triggers_replace = [
+    local.traefik_forwarding_rule,
+    var.gcp_project_b_id,
+    var.gcp_region,
+  ]
+
+  provisioner "local-exec" {
+    command = "gcloud compute forwarding-rules update ${self.input.forwarding_rule} --region=${self.input.region} --project=${self.input.project} --allow-global-access --quiet"
+  }
+}
+
 # Publish the Internal Load Balancer across perimeters via Service Attachment
 resource "google_compute_service_attachment" "traefik_psc_attachment" {
-  provider              = google.project_b
-  project               = var.gcp_project_b_id
-  name                  = "${var.env_name_short}-traefik-psc-attachment"
-  region                = var.gcp_region
-  description           = "PSC Service Attachment for Traefik Ingress ILB in Project B"
-  
+  provider    = google.project_b
+  project     = var.gcp_project_b_id
+  name        = "${var.env_name_short}-traefik-psc-attachment"
+  region      = var.gcp_region
+  description = "PSC Service Attachment for Traefik Ingress ILB in Project B"
+
   # Settings for automatically accepting connections from Project A
   connection_preference = "ACCEPT_AUTOMATIC"
 
@@ -69,11 +90,6 @@ resource "google_compute_service_attachment" "traefik_psc_attachment" {
     precondition {
       condition     = data.google_compute_forwarding_rule.traefik_ilb.ip_protocol == "TCP"
       error_message = "The Traefik forwarding rule must use TCP for PSC service attachment."
-    }
-
-    precondition {
-      condition     = try(data.google_compute_forwarding_rule.traefik_ilb.allow_global_access, false) == true
-      error_message = "The Traefik forwarding rule must have allow_global_access enabled before it can back a global external Application Load Balancer through a PSC NEG."
     }
 
     precondition {
