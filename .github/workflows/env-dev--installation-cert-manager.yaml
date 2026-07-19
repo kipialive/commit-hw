@@ -103,11 +103,16 @@ jobs:
 
           # Deploying upstream jetstack/cert-manager with CRDs enabled
           # Cloud infrastructure auth logic: WIF Token → Pod IAM Federation
+          # Overriding image registries from quay.io to docker.io mirrors due to private cluster NAT constraints
           if ! helm upgrade --install cert-manager jetstack/cert-manager \
                   --namespace "${CERT_MANAGER_NAMESPACE}" \
                   --create-namespace \
                   --version "${CERT_MANAGER_CHART_VERSION}" \
                   --set crds.enabled=true \
+                  --set image.repository="docker.io/jetstack/cert-manager-controller" \
+                  --set webhook.image.repository="docker.io/jetstack/cert-manager-webhook" \
+                  --set cainjector.image.repository="docker.io/jetstack/cert-manager-cainjector" \
+                  --set startupapicheck.image.repository="docker.io/jetstack/cert-manager-startupapicheck" \
                   --set 'extraArgs={--dns01-recursive-nameservers=8.8.8.8:53\,1.1.1.1:53,--dns01-recursive-nameservers-only=true}' \
                   --wait --timeout="${WAIT_TIMEOUT}" 2>"${ERROR_LOG_FILE}"; then
             if grep -q "Forbidden" "${ERROR_LOG_FILE}"; then
