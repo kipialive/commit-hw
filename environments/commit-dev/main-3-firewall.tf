@@ -64,7 +64,8 @@ resource "google_compute_firewall" "vpc_b_allow_internal" {
   source_ranges = [
     var.vpc_b_subnet_cidr,
     var.gke_pod_cidr_range,
-    var.gke_service_cidr_range
+    var.gke_service_cidr_range,
+    var.vpc_b_psc_nat_cidr
   ]
 
   allow {
