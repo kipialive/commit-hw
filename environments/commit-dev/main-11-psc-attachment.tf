@@ -72,6 +72,11 @@ resource "google_compute_service_attachment" "traefik_psc_attachment" {
     }
 
     precondition {
+      condition     = try(data.google_compute_forwarding_rule.traefik_ilb.allow_global_access, false) == true
+      error_message = "The Traefik forwarding rule must have allow_global_access enabled before it can back a global external Application Load Balancer through a PSC NEG."
+    }
+
+    precondition {
       condition     = local.traefik_service_ilb_ip == null || data.google_compute_forwarding_rule.traefik_ilb.ip_address == local.traefik_service_ilb_ip
       error_message = "The Traefik forwarding rule IP must match the Kubernetes Service load balancer IP."
     }

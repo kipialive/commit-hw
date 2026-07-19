@@ -1101,6 +1101,8 @@ traefik:
     annotations:
       # Setting up an INTERNAL load balancer in Google Cloud
       cloud.google.com/load-balancer-type: "Internal"
+      # Required when a global external Application Load Balancer uses this ILB via PSC NEG
+      networking.gke.io/internal-load-balancer-allow-global-access: "true"
       # We fix the load balancer strictly within our private subnet VPC B
       cloud.google.com/load-balancer-backend-subnet: "commit-dev-subnet-b"
           # # NLB type - Use legacy in-tree controller - built-in option
