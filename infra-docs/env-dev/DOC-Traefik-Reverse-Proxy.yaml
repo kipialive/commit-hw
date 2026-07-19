@@ -33,34 +33,39 @@ EOF
 
 [v] rm -rf ./traefik-dashboard-basicauth-secret.yaml
 
-
-
-
-
-
-
-
-
-
 ##### ##### ##### ##### ##### ##### ##### #####
-### NLB - Traefik Reverse Proxy (K8s) ###
+### Internal Passthrough Network Load Balancer (ILB) - Traefik Reverse Proxy (K8s) ###
 ##### ##### ##### ##### ##### ##### ##### #####
 
 ❯ kubectl get svc traefik-reverse-proxy -n traefik-reverse-proxy
-NAME                    TYPE           CLUSTER-IP       EXTERNAL-IP                                                                     PORT(S)                      AGE
-traefik-reverse-proxy   LoadBalancer   172.20.246.188   k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com   80:30379/TCP,443:31034/TCP   35s
+NAME                    TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
+traefik-reverse-proxy   LoadBalancer   172.17.10.17   10.20.0.7     80:30398/TCP,443:32653/TCP   105s
+
+❯ gcloud compute forwarding-rules list --regions=us-central1 --project=supple-lock-502820-g3                                                                                                               G CommIT HW - Project A 23:15:24
+NAME                              REGION       IP_ADDRESS  IP_PROTOCOL  TARGET
+a78cd30f189ea4f7a978e03677dcda1a  us-central1  10.20.0.7   TCP          us-central1/backendServices/a78cd30f189ea4f7a978e03677dcda1a
 
 ##### ##### ##### ##### ##### ##### ##### #####
 ### Logs - Traefik Reverse Proxy (K8s) ###
 ##### ##### ##### ##### ##### ##### ##### #####
 kubectl -n traefik-reverse-proxy logs deploy/traefik-reverse-proxy
 
+
+
+
+
+
+
+
+
+
+
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ######
 ### Route 53 - Create DNS Records in !!! Private Hosted Zone !!! ###
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ######
 
-traefik-dashboard.dev.commit.cloudsmesh.be | A | Alias to NLB | us-east-1 | k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com
-grafana.dev.commit.cloudsmesh.be | A | Alias to NLB | us-east-1 | k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com
+# traefik-dashboard.dev.commit.cloudsmesh.be | A | Alias to NLB | us-east-1 | k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com
+# grafana.dev.commit.cloudsmesh.be | A | Alias to NLB | us-east-1 | k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com
 
 ###### ###### ###### ###### ###### ######
 ### Tests ###

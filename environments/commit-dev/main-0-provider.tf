@@ -38,6 +38,18 @@ provider "google" {
 }
 
 ################################################################################
+# Kubernetes Provider Dynamic Configuration for GKE Data Queries
+################################################################################
+
+data "google_client_config" "default" {}
+
+provider "kubernetes" {
+  host                   = "https://${module.gke_standard_cluster.endpoint}"
+  token                  = data.google_client_config.default.access_token
+  cluster_ca_certificate = base64decode(module.gke_standard_cluster.ca_certificate)
+}
+
+################################################################################
 # Terraform Settings & Required Providers
 ################################################################################
 terraform {
