@@ -83,3 +83,38 @@ module "vpc_b" {
     ]
   }
 }
+
+# ---------------------------------------------------------------
+# Cloud Router for VPC B to handle NAT gateway routing
+# Data flow: GKE Nodes (VPC B) → Cloud Router → Cloud NAT
+# ---------------------------------------------------------------
+resource "google_compute_router" "router_b" {
+  # Use standard single provider argument for native resources
+  provider = google.project_b
+
+  name    = "${var.env_name_short}-vpc-b-router"
+  region  = var.gcp_region
+  project = var.gcp_project_b_id
+  network = module.vpc_b.network_name # Automatically pulls the network name from module output
+}
+
+# ---------------------------------------------------------------
+# Cloud NAT Gateway to grant private GKE nodes internet access
+# Access path: Private Subnet B → Cloud NAT → External Repositories (Quay.io)
+# ---------------------------------------------------------------
+resource "google_compute_router_nat" "nat_b" {
+  # Use standard single provider argument for native resources
+  provider = google.project_b
+
+  name                               = "${var.env_name_short}-vpc-b-nat"
+  router                             = google_compute_router.router_b.name
+  region                             = google_compute_router.router_b.region
+  project                            = var.gcp_project_b_id
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  log_config {
+    enable = true
+    filter = "ERRORS_ONLY"
+  }
+}

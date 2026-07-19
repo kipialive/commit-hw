@@ -42,12 +42,12 @@ jobs:
     # Declare environment variables for the current job
     env:
       CERT_MANAGER_NAMESPACE: "cert-manager"
-      HELM_FOLDER: "helm-charts/env-dev"
+      HELM_FOLDER: ".github/helm-charts/env-dev"
       CERT_MANAGER_CHART_VERSION: "1.21.0" # https://artifacthub.io/packages/helm/cert-manager/cert-manager
       CERT_MANAGER_RELEASE_NAME: "cert-manager-resources"
       ERROR_LOG_FILE: "err.log"
-      CHART_DIR: "helm-charts/env-dev/cert-manager"
-      CHART_VALUES: "helm-charts/env-dev/cert-manager/values.yaml"
+      CHART_DIR: ".github/helm-charts/env-dev/cert-manager"
+      CHART_VALUES: ".github/helm-charts/env-dev/cert-manager/values.yaml"
       WAIT_TIMEOUT: "5m"
       KUBECTL_TIMEOUT: "120s"
 
