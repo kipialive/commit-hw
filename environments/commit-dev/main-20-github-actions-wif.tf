@@ -53,3 +53,14 @@ resource "google_service_account_iam_member" "wif_sa_binding" {
   # Only allows pushes from your specific GitHub repository to assume this role
   member = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/kipialive/commit-hw"
 }
+
+# ---------------------------------------------------------------
+# GKE Access Permission for the Deployment Service Account
+# Access path: Service Account → IAM Project Policy → GKE Admin Rights
+# ---------------------------------------------------------------
+
+resource "google_project_iam_member" "sa_gke_admin" {
+  project = var.gcp_project_b_id
+  role    = "roles/container.admin"
+  member  = "serviceAccount:tf-gke-commit-dev-gke--tvos@${var.gcp_project_b_id}.iam.gserviceaccount.com"
+}
