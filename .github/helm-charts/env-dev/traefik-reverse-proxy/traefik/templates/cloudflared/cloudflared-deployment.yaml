@@ -1,0 +1,48 @@
+## .github/helm-charts/env-dev/traefik-reverse-proxy/traefik/templates/cloudflared/cloudflared-deployment.yaml
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: cloudflared
+#   namespace: traefik-reverse-proxy
+#   labels:
+#     app.kubernetes.io/name: cloudflared
+#     app.kubernetes.io/managed-by: Helm
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app.kubernetes.io/name: cloudflared
+#   template:
+#     metadata:
+#       labels:
+#         app.kubernetes.io/name: cloudflared
+#     spec:
+#       containers:
+#         - name: cloudflared
+#           image: cloudflare/cloudflared:latest
+#           imagePullPolicy: IfNotPresent
+#           args:
+#             - tunnel
+#             - --no-autoupdate
+#             - --credentials-file
+#             - /etc/cloudflared/webhook-tunnel.json
+#             - --config
+#             - /etc/cloudflared/config.yml
+#             - run
+#             - webhook-tunnel
+#           volumeMounts:
+#             - name: cloudflared-credentials
+#               mountPath: /etc/cloudflared
+#               readOnly: true
+#           resources:
+#             requests:
+#               cpu: 50m
+#               memory: 64Mi
+#             limits:
+#               cpu: 200m
+#               memory: 256Mi
+#       volumes:
+#         - name: cloudflared-credentials
+#           secret:
+#             secretName: cloudflared-credentials
+---

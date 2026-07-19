@@ -1,0 +1,152 @@
+tolerations:
+- key: dedicated
+  value: infra
+  operator: Equal
+  effect: NoSchedule
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      preference:
+        matchExpressions:
+        - key: eks.amazonaws.com/capacityType
+          operator: In
+          values:
+          - ON_DEMAND
+        - key: dedicated
+          operator: In
+          values:
+          - infra
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::724500976236:role/cloudwatch-exporter-b2b-gigya-v3-staging-apse2
+config: |-
+  region: ap-southeast-2
+  period_seconds: 300
+  metrics:
+  - aws_namespace: AWS/RDS
+    aws_metric_name: BinLogDiskUsage
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: BurstBalance
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: CPUUtilization
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: CPUCreditUsage
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: CPUCreditBalance
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: DatabaseConnections
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: DiskQueueDepth
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average, Maximum]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: FailedSQLServerAgentJobsCount
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: FreeableMemory
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: FreeStorageSpace
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: MaximumUsedTransactionIDs
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: NetworkReceiveThroughput
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: NetworkTransmitThroughput
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: OldestReplicationSlotLag
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: ReadIOPS
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: ReadLatency
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average, Maximum]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: ReadThroughput
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: ReplicaLag
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: ReplicationSlotDiskUsage
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: SwapUsage
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: TransactionLogsDiskUsage
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: TransactionLogsGeneration
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: WriteIOPS
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: WriteLatency
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average, Maximum]
+
+  - aws_namespace: AWS/RDS
+    aws_metric_name: WriteThroughput
+    aws_dimensions: [DBInstanceIdentifier]
+    aws_statistics: [Average]
+serviceMonitor:
+  enabled: true

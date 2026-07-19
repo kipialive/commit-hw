@@ -1,0 +1,242 @@
+## .github/workflows/env-dev--deploy-traefik-reverse-proxy.yaml
+name: Deploy Traefik Reverse Proxy to GKE
+
+on:
+  push:
+    branches:
+      # - never-trigger-this-branch
+      - main
+  workflow_dispatch:
+    inputs:
+      gke_cluster_name:
+        description: 'GKE Cluster Name'
+        required: true
+        type: string
+        default: 'commit-dev-gke-cluster'
+
+  workflow_call:
+    inputs:
+      gke_cluster_name:
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+env:
+  ENVIRONMENT: commit-dev
+  GCP_PROJECT_ID: ${{ secrets.COMMIT_HW_GCP_PROJECT_ID_B }} 
+  GCP_REGION: ${{ secrets.COMMIT_HW_GCP_REGION_DEV }} 
+  GKE_CLUSTER: ${{ github.event.inputs.gke_cluster_name || 'commit-dev-gke-cluster' }}
+  GCP_PROJECT_NUMBER: ${{ secrets.COMMIT_HW_GCP_PROJECT_B_NUMBER }} 
+  GCP_SERVICE_ACCOUNT: ${{ secrets.COMMIT_HW_GCP_SERVICE_ACCOUNT_PROJECT_B }} 
+
+jobs:
+  deploy-traefik-reverse-proxy:
+    name: Deploy Traefik Reverse Proxy to GKE
+    runs-on: ubuntu-24.04
+    environment: commit-dev
+
+    # Declare environment variables for the current job
+    env:
+      NAMESPACE: "traefik-reverse-proxy"
+      USE_LOCAL_CHART: "true"
+      CHART_NAME: "traefik/traefik"
+      TRAEFIK_RELEASE_NAME: "traefik-reverse-proxy"
+      HELM_FOLDER: ".github/helm-charts/env-dev"
+      CHART_DIR: ".github/helm-charts/env-dev/traefik-reverse-proxy/traefik"
+      CHART_VALUES: ".github/helm-charts/env-dev/traefik-reverse-proxy/traefik/values.yaml"
+      ERROR_LOG_FILE: "err.log"
+      KUBECTL_TIMEOUT: "120s"
+      HELM_TIMEOUT: "5m"
+
+    steps:
+      # Step 1: Print who triggered this build (whoami)
+      - name: Who triggered this build?
+        run: |
+          echo "Triggered by: ${{ github.actor }}"
+
+      # Step 2: Print the caller repo name
+      - name: Print caller repo "CommIT-HW" name
+        run: |
+          echo "CommIT-HW Caller Repo Name is: ${{ github.repository }}"
+
+      # Step 3: Checkout the repository code (This ensures the GitHub Actions runner has access to your repo)
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      # Step 4: Authenticate to Google Cloud via OIDC provider without static service account keys
+      - name: Authenticate to Google Cloud via OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          # GitHub Actions → GCP Workload Identity Federation exchange
+          workload_identity_provider: "projects/${{ env.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
+
+      # Step 5: Fetch GKE cluster access credentials and automatically configure local kubeconfig
+      - name: Set up Cloud SDK and Configure kubeconfig
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: "${{ env.GKE_CLUSTER }}"
+          location: "${{ env.GCP_REGION }}"
+          project_id: "${{ env.GCP_PROJECT_ID }}"
+
+      # Step 6: Perform a smoke test to ensure direct connectivity to the private GKE control plane
+      - name: Verify cluster connectivity
+        run: |
+          echo "Checking connection to GKE..."
+          kubectl get nodes || { echo "❌ ERROR: Cannot connect to GKE cluster"; exit 1; }
+
+      # Step 7: Inspect target destination namespace existence state and perform pre-creation
+      - name: Ensure Target Namespace Exists
+        run: |
+          set -euo pipefail
+          echo "Checking namespace: ${NAMESPACE}"
+
+          if kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
+            echo "✅ Namespace ${NAMESPACE} already exists. Continuing deployment..."
+          else
+            echo "⚠️ Namespace ${NAMESPACE} does not exist. Trying to create..."
+            if ! kubectl create namespace "${NAMESPACE}" 2>"${ERROR_LOG_FILE}"; then
+              if grep -q "Forbidden" "${ERROR_LOG_FILE}"; then
+                echo "❌ ERROR: Cannot create namespace ${NAMESPACE}. Missing RBAC permission!"
+                cat "${ERROR_LOG_FILE}"
+                exit 1
+              else
+                echo "❌ ERROR: Failed to create namespace ${NAMESPACE} due to an unknown error:"
+                cat "${ERROR_LOG_FILE}"
+                exit 1
+              fi
+            else
+              echo "✅ Namespace ${NAMESPACE} successfully created."
+            fi
+          fi
+
+      # Step 8: Initialize external repositories and fetch nested subchart dependency bindings
+      - name: Update Traefik Dependencies
+        run: |
+          set -euo pipefail
+          echo "Adding Traefik Helm repository..."
+          helm repo list 2>/dev/null | grep -q traefik || helm repo add traefik https://traefik.github.io/charts
+          helm repo update
+
+          echo "Pulling Traefik subchart dependency..."
+          helm dependency update "${CHART_DIR}"
+
+      # Step 9: Conditional Helm static analysis validation check (Local wrapper charts only)
+      - name: Helm Chart Lint Validation
+        run: |
+          set -euo pipefail
+          if [ "${USE_LOCAL_CHART}" = "true" ]; then
+            echo "Linting Helm chart from: ${CHART_DIR}"
+            helm lint "${CHART_DIR}"
+          else
+            echo "Skipping Helm lint (USE_LOCAL_CHART != true)"
+          fi
+
+      # Step 10: Manual extraction and updating of upstream Traefik Custom Resource Definitions
+      - name: Force Update Traefik CRDs
+        run: |
+          set -euo pipefail
+          echo "Updating Traefik CRDs from subchart..."
+          CRD_TGZ=$(ls "${CHART_DIR}"/charts/traefik-*.tgz 2>/dev/null | head -1)
+          if [ -n "${CRD_TGZ}" ]; then
+            helm show crds "${CRD_TGZ}" | kubectl apply --server-side --force-conflicts -f -
+            echo "CRDs updated successfully"
+          else
+            echo "No traefik subchart found in ${CHART_DIR}/charts/, skipping CRD update"
+          fi
+
+      # Step 11: Render execution dry-run simulation test matrix
+      - name: Helm Template Dry-Run Test
+        run: |
+          set -euo pipefail
+          CHART_TO_USE="${CHART_NAME}"
+          if [ "${USE_LOCAL_CHART}" = "true" ]; then
+            CHART_TO_USE="${CHART_DIR}"
+          fi
+
+          echo "Dry-run templating Helm chart from: ${CHART_TO_USE} with values: ${CHART_VALUES}"
+          helm template "${TRAEFIK_RELEASE_NAME}" "${CHART_TO_USE}" -n "${NAMESPACE}" -f "${CHART_VALUES}"
+
+      # Step 12: Atomic Helm release execution deployment block
+      - name: Deploy Traefik Reverse Proxy via Helm
+        run: |
+          set -euo pipefail
+          CHART_TO_USE="${CHART_NAME}"
+          if [ "${USE_LOCAL_CHART}" = "true" ]; then
+            CHART_TO_USE="${CHART_DIR}"
+          fi
+
+          echo "Deploying Helm chart from: ${CHART_TO_USE} with values: ${CHART_VALUES}"
+          helm upgrade --install "${TRAEFIK_RELEASE_NAME}" "${CHART_TO_USE}" \
+            --namespace "${NAMESPACE}" \
+            --create-namespace \
+            -f "${CHART_VALUES}" \
+            --rollback-on-failure --wait --timeout="${HELM_TIMEOUT}"
+
+          echo "Current Traefik Reverse pods:"
+          kubectl get pods -n "${NAMESPACE}" -o wide
+
+          echo "Show Traefik services:"
+          kubectl get svc -n "${NAMESPACE}" -o wide
+
+      # Step 13: Core component container health validation block
+      - name: Wait for Traefik Pod Readiness
+        run: |
+          set -euo pipefail
+          echo "Waiting for Traefik pods to enter ready state..."
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=traefik \
+            -n "${NAMESPACE}" --timeout="${KUBECTL_TIMEOUT}"
+
+          TRAEFIK_STATUS="$(kubectl get pods -n "${NAMESPACE}" -l app.kubernetes.io/name=traefik -o jsonpath='{.items[0].status.containerStatuses[0].ready}')"
+          if [ "${TRAEFIK_STATUS}" != "true" ]; then
+            echo "❌ Traefik Reverse Proxy pod is NOT ready!"
+            exit 1
+          else
+            echo "✅ Traefik Reverse Proxy pod is ready!"
+          fi
+
+      # Step 14: Dynamic extraction of allocated internal LoadBalancer IP infrastructure address
+      - name: Extract Traefik Service Endpoint
+        id: get_endpoint
+        run: |
+          set -euo pipefail
+          # Cloud provider routing logic: GCP ILB IP address assignment extraction
+          EP="$(kubectl get svc -n "${NAMESPACE}" -l app.kubernetes.io/name=traefik -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+          if [ -z "${EP}" ]; then
+            EP="$(kubectl get svc -n "${NAMESPACE}" -l app.kubernetes.io/name=traefik -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+          fi
+          
+          echo "Traefik target endpoint resolved: ${EP}"
+          # Save to runner environment file for down-stream workflows orchestration usage
+          echo "TRAEFIK_ENDPOINT=${EP}" >> $GITHUB_ENV
+
+      # Step 15: Run post-deployment deployment rollout status validation loop
+      - name: Verify Deployment Rollout Status Validation Report
+        if: always()
+        run: |
+          set -euo pipefail
+          DEPLOYMENT_APP_NAME="$(kubectl get deploy -n "${NAMESPACE}" -l app.kubernetes.io/name=traefik -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")"
+          
+          if [ -z "${DEPLOYMENT_APP_NAME}" ]; then
+            echo "❌ Error: Traefik deployment not found. Printing namespace state:"
+            kubectl get pods -n "${NAMESPACE}" -o wide
+            exit 1
+          fi
+
+          kubectl rollout status "deployment/${DEPLOYMENT_APP_NAME}" -n "${NAMESPACE}" --timeout="${KUBECTL_TIMEOUT}" || {
+            echo "❌ Rollout failed. Collecting debug info..."
+            kubectl get pods -n "${NAMESPACE}" -o wide
+
+            echo "---- Describe pods ----"
+            kubectl describe pods -n "${NAMESPACE}" -l app.kubernetes.io/name=traefik
+
+            echo "---- Last 50 logs from first pod ----"
+            FIRST_POD="$(kubectl get pods -n "${NAMESPACE}" -l app.kubernetes.io/name=traefik -o jsonpath='{.items[0].metadata.name}')"
+            kubectl logs --tail=50 "${FIRST_POD}" -n "${NAMESPACE}"
+            exit 1
+          }

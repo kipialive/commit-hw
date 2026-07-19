@@ -1,0 +1,36 @@
+## .github/helm-charts/env-dev/traefik-reverse-proxy/traefik/Chart.yaml
+##
+## Wrapper chart that pulls the official Traefik Helm chart as a dependency.
+## Custom resources (IngressRoutes, Middlewares, SealedSecrets, StorageClass)
+## live in templates/ alongside the subchart.
+##
+## To upgrade Traefik, bump the dependency version below and run:
+##   helm dependency update .
+##
+apiVersion: v2
+name: traefik-reverse-proxy
+description: A Traefik based Kubernetes ingress controller
+version: 1.0.0
+appVersion: v3.6.12
+type: application
+home: https://traefik.io/
+icon: https://raw.githubusercontent.com/traefik/traefik/master/docs/content/assets/img/traefik.logo.png
+keywords:
+  - traefik
+  - ingress
+  - networking
+  - reverse-proxy
+kubeVersion: ">=1.22.0-0"
+maintainers:
+  - email: michel.loiseleur@traefik.io
+    name: mloiseleur
+  - email: remi.buisson@traefik.io
+    name: darkweaver87
+  - name: jnoordsij
+sources:
+  - https://github.com/traefik/traefik-helm-chart
+  - https://github.com/traefik/traefik
+dependencies:
+  - name: traefik
+    version: "39.0.7"
+    repository: "https://traefik.github.io/charts"
