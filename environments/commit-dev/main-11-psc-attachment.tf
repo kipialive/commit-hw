@@ -15,26 +15,29 @@
 # Project B: Private Service Connect (PSC) Service Attachment for Traefik
 ################################################################################
 
-# Find the automatically created Forwarding Rule for the Traefik ILB.
-# GKE names forwarding rules using the format: "a" + md5 hash of the K8s Service UID without hyphens.
-data "google_compute_forwarding_rule" "traefik_ilb" {
-  provider = google.project_b
-  project  = var.gcp_project_b_id
-  region   = var.gcp_region
-  name     = "a${replace(data.kubernetes_service.traefik.metadata[0].uid, "-", "")}"
-
-  # Delay evaluation until the Kubernetes service data is fully retrieved
-  depends_on = [
-    data.kubernetes_service.traefik
-  ]
-}
-
 # Fetch the Kubernetes Service data to extract the system UID of Traefik
 data "kubernetes_service" "traefik" {
   metadata {
     name      = "traefik-reverse-proxy"
     namespace = "traefik-reverse-proxy"
   }
+}
+
+locals {
+  traefik_service_uid     = replace(data.kubernetes_service.traefik.metadata[0].uid, "-", "")
+  traefik_forwarding_rule = "a${substr(local.traefik_service_uid, 0, 31)}"
+  traefik_service_ilb_ip  = try(data.kubernetes_service.traefik.status[0].load_balancer[0].ingress[0].ip, null)
+  psc_nat_subnet_name     = "${var.env_name_short}-psc-nat-subnet"
+  psc_nat_subnet_key      = "${var.gcp_region}/${local.psc_nat_subnet_name}"
+}
+
+# Find the automatically created forwarding rule for the Traefik Internal
+# Passthrough Network Load Balancer.
+data "google_compute_forwarding_rule" "traefik_ilb" {
+  provider = google.project_b
+  project  = var.gcp_project_b_id
+  region   = var.gcp_region
+  name     = local.traefik_forwarding_rule
 }
 
 # Publish the Internal Load Balancer across perimeters via Service Attachment
@@ -55,9 +58,24 @@ resource "google_compute_service_attachment" "traefik_psc_attachment" {
   target_service = data.google_compute_forwarding_rule.traefik_ilb.self_link
 
   # Reference the dedicated PSC NAT subnet created by the vpc_b module.
-  # In the terraform-google-modules/network/google module, the subnets_self_links 
-  # output returns an array where the PSC NAT subnet is the second element (index [1]).
-  nat_subnets = [module.vpc_b.subnets_self_links[1]]
+  nat_subnets = [module.vpc_b.subnets[local.psc_nat_subnet_key].self_link]
+
+  lifecycle {
+    precondition {
+      condition     = data.google_compute_forwarding_rule.traefik_ilb.load_balancing_scheme == "INTERNAL"
+      error_message = "The Traefik forwarding rule must be an internal load balancer forwarding rule."
+    }
+
+    precondition {
+      condition     = data.google_compute_forwarding_rule.traefik_ilb.ip_protocol == "TCP"
+      error_message = "The Traefik forwarding rule must use TCP for PSC service attachment."
+    }
+
+    precondition {
+      condition     = local.traefik_service_ilb_ip == null || data.google_compute_forwarding_rule.traefik_ilb.ip_address == local.traefik_service_ilb_ip
+      error_message = "The Traefik forwarding rule IP must match the Kubernetes Service load balancer IP."
+    }
+  }
 }
 
 ################################################################################
