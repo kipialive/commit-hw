@@ -1,7 +1,7 @@
 ## environments/commit-dev/main-11-psc-attachment.tf
 
 ###### ###### ###### ###### ###### ###### ###### ###### ######
-### Private Service Connect (PSC) ###
+### Private Service Connect (PSC) - Attachment ###
 ###### ###### ###### ###### ###### ###### ###### ###### ######
 
 /*
