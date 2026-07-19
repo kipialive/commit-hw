@@ -98,12 +98,8 @@ jobs:
             echo "⚠️ cert-manager does not exist. Installing via Helm..."
           fi
 
-          # Using the active official community chart repository URL
-          helm repo add jetstack https://charts.cert-manager.io
-          helm repo update
-
-          # Deploying clean upstream jetstack/cert-manager v1.21.0 using official registry.k8s.io images
-          if ! helm upgrade --install cert-manager jetstack/cert-manager \
+          # Deploying cleanly via OIDC/OCI registry instead of legacy HTTP helm repositories
+          if ! helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
                   --namespace "${CERT_MANAGER_NAMESPACE}" \
                   --create-namespace \
                   --version "${CERT_MANAGER_CHART_VERSION}" \
@@ -120,9 +116,9 @@ jobs:
               exit 1
             fi
           else
-            echo "✅ cert-manager successfully deployed via Helm."
+            echo "✅ cert-manager successfully deployed via OCI Helm chart."
           fi
-
+      
       # Step 8: Wait and verify cert-manager pods readiness status
       - name: Wait for cert-manager Core Components
         run: |
