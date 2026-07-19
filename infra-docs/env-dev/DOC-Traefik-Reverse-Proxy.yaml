@@ -1,0 +1,81 @@
+###### ###### ###### ###### ###### ######
+### **Create Sealed-Secret** ###
+###### ###### ###### ###### ###### ######
+cd ~/HW/commit-hw/.github/helm-charts/env-dev/traefik-reverse-proxy/scripts
+
+gcloud container clusters get-credentials commit-dev-gke-cluster --region us-central1 --project supple-lock-502820-g3
+kubectx commint-hw-dev-gke-cluster=gke_supple-lock-502820-g3_us-central1_commit-dev-gke-cluster
+
+# This part already done during traefik installation #
+kubectl get secret -n kube-system \
+--selector=sealedsecrets.bitnami.com/sealed-secrets-key=active \
+-o jsonpath="{.items[0].data['tls\.crt']}" | base64 --decode > public.pem
+
+###### ###### ###### ######
+# traefik-dashboard-basicauth-secret.yaml
+###### ###### ###### ######
+cat << EOF > traefik-dashboard-basicauth-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: traefik-dashboard-basicauth
+  namespace: traefik-reverse-proxy
+type: Opaque
+data:
+#   echo -n "$(htpasswd -nbB admin '<your_super_password>')" | base64  ### use for to generate 'admin:{SHA}...')
+  users: |-
+    Y**************************************************t
+EOF
+###### ###### ###### ######
+[v] kubeseal --format yaml --cert ~/HW/commit-hw/.github/helm-charts/env-dev/traefik-reverse-proxy/scripts/public.pem --scope=cluster-wide < traefik-dashboard-basicauth-secret.yaml > ~/HW/commit-hw/.github/helm-charts/env-dev/traefik-reverse-proxy/traefik/templates/middlewares/sealedsecret-traefik-dashboard.yaml
+
+[v] ll ~/HW/commit-hw/.github/helm-charts/env-dev/traefik-reverse-proxy/traefik/templates/middlewares/
+
+[v] rm -rf ./traefik-dashboard-basicauth-secret.yaml
+
+
+
+
+
+
+
+
+
+
+##### ##### ##### ##### ##### ##### ##### #####
+### NLB - Traefik Reverse Proxy (K8s) ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+❯ kubectl get svc traefik-reverse-proxy -n traefik-reverse-proxy
+NAME                    TYPE           CLUSTER-IP       EXTERNAL-IP                                                                     PORT(S)                      AGE
+traefik-reverse-proxy   LoadBalancer   172.20.246.188   k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com   80:30379/TCP,443:31034/TCP   35s
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Logs - Traefik Reverse Proxy (K8s) ###
+##### ##### ##### ##### ##### ##### ##### #####
+kubectl -n traefik-reverse-proxy logs deploy/traefik-reverse-proxy
+
+###### ###### ###### ###### ###### ###### ###### ###### ###### ######
+### Route 53 - Create DNS Records in !!! Private Hosted Zone !!! ###
+###### ###### ###### ###### ###### ###### ###### ###### ###### ######
+
+traefik-dashboard.dev.commit.cloudsmesh.be | A | Alias to NLB | us-east-1 | k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com
+grafana.dev.commit.cloudsmesh.be | A | Alias to NLB | us-east-1 | k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com
+
+###### ###### ###### ###### ###### ######
+### Tests ###
+###### ###### ###### ###### ###### ######
+
+dig traefik-dashboard.dev.commit.cloudsmesh.be +short
+curl -I -v https://traefik-dashboard.dev.commit.cloudsmesh.be/dashboard/
+curl -kv https://traefik-dashboard.dev.commit.cloudsmesh.be/dashboard/ 2>&1 | grep -E "subject:|issuer:|expire|CN="
+
+
+dig grafana.dev.commit.cloudsmesh.be +short
+curl -I -v https://grafana.dev.commit.cloudsmesh.be/
+curl -kv https://grafana.dev.commit.cloudsmesh.be/ 2>&1 | grep -E "subject:|issuer:|expire|CN="
+
+
+
+
+

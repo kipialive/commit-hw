@@ -1100,19 +1100,23 @@ traefik:
     # -- Additional annotations applied to both TCP and UDP services (e.g. for cloud provider specific config)
     # annotations: {}
     annotations:
-      # NLB type - Use legacy in-tree controller - built-in option
-      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-      # Make NLB internal - Legacy way to make it internal (works without LBC - AWS Load Balancer Controller)
-      service.beta.kubernetes.io/aws-load-balancer-scheme: "internal" # internal NLB
-      service.beta.kubernetes.io/aws-load-balancer-internal: "true" # NOTE # This is a mandatory parameter with internal NLB
-      # Target type: instance (required for Twingate)
-      # service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
-      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"    # targets = Pods (recommended) - !!! This option is a working solution !!!
-      # Health checks
-      service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
-      service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "traffic-port"
-      # Optional tags
-      service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Environment=dev,GitRepo=infrastructure,Owner=DevOps,DeliveryType=Helm,Project=DEV,AWS_Service=Internal_NLB,Name=traefik-internal-nlb-dev"
+      # Setting up an INTERNAL load balancer in Google Cloud
+      cloud.google.com/load-balancer-type: "Internal"
+      # We fix the load balancer strictly within our private subnet VPC B
+      cloud.google.com/load-balancer-backend-subnet: "commit-dev-subnet-b"
+          # # NLB type - Use legacy in-tree controller - built-in option
+          # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+          # # Make NLB internal - Legacy way to make it internal (works without LBC - AWS Load Balancer Controller)
+          # service.beta.kubernetes.io/aws-load-balancer-scheme: "internal" # internal NLB
+          # service.beta.kubernetes.io/aws-load-balancer-internal: "true" # NOTE # This is a mandatory parameter with internal NLB
+          # # Target type: instance (required for Twingate)
+          # # service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
+          # service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"    # targets = Pods (recommended) - !!! This option is a working solution !!!
+          # # Health checks
+          # service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "TCP"
+          # service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "traffic-port"
+          # # Optional tags
+          # service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Environment=dev,GitRepo=infrastructure,Owner=DevOps,DeliveryType=Helm,Project=DEV,AWS_Service=Internal_NLB,Name=traefik-internal-nlb-dev"
       # # Use a single, pre-created SG (optional)
       # service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-0b3a5ce6a70b45cdc"
       # Use instance targets until AWS LB Controller is installed
@@ -1155,7 +1159,7 @@ traefik:
     # clusterIP: "2.3.4.5"
     # loadBalancerSourceRanges: []
     loadBalancerSourceRanges:
-      - 10.10.0.0/16       # Keyper Dev VPC CIDRs
+      - 10.20.0.0/16          # GCP VPC B CIDR range
       # - 0.0.0.0/0           # For Debug ONLY
   
     # - 192.168.0.1/32

@@ -23,11 +23,11 @@ certificate:
     - "*.devops.cloudsmesh.be"
     - "devops.cloudsmesh.be"
 
-# Wildcard Certificate configuration (*.dev.devops.cloudsmesh.be)
+# Wildcard Certificate configuration (*.dev.commit.cloudsmesh.be)
 devCertificate:
   name: dev-devops-wildcard-tls
   namespace: traefik-reverse-proxy
   secretName: dev-devops-wildcard-tls
   dnsNames:
-    - "*.dev.devops.cloudsmesh.be"
-    - "dev.devops.cloudsmesh.be"
+    - "*.dev.commit.cloudsmesh.be"
+    - "dev.commit.cloudsmesh.be"
