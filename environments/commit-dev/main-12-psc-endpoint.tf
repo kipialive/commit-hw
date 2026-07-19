@@ -1,4 +1,4 @@
-### environments/commit-dev/main-12-psc-endpoint.tf
+## environments/commit-dev/main-12-psc-endpoint.tf
 
 ###### ###### ###### ###### ###### ###### ###### ###### ######
 ### Private Service Connect (PSC) - Endpoint ###
