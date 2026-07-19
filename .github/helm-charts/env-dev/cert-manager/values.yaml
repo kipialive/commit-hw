@@ -1,0 +1,33 @@
+## helm-charts/env-dev/cert-manager/values.yaml
+
+# ClusterIssuer configuration
+clusterIssuer:
+  name: letsencrypt-prod-devops
+  email: devops.admin@cloudsmesh.be
+  ### first TEST on STAGING Let's Encrypt - Certificate Authority: ###
+  # This is a staging server (does not issue valid certificates, but allows testing without limits).
+  # server: https://acme-staging-v02.api.letsencrypt.org/directory
+  server: https://acme-v02.api.letsencrypt.org/directory
+  privateKeySecret: letsencrypt-prod-devops-account-key
+  solver:
+    dns01:
+      region: us-east-1
+      hostedZoneID: Z0989205280ML6PNH5VKZ
+
+# Wildcard Certificate configuration (*.devops.cloudsmesh.be)
+certificate:
+  name: devops-wildcard-tls
+  namespace: traefik-reverse-proxy
+  secretName: devops-wildcard-tls
+  dnsNames:
+    - "*.devops.cloudsmesh.be"
+    - "devops.cloudsmesh.be"
+
+# Wildcard Certificate configuration (*.dev.devops.cloudsmesh.be)
+devCertificate:
+  name: dev-devops-wildcard-tls
+  namespace: traefik-reverse-proxy
+  secretName: dev-devops-wildcard-tls
+  dnsNames:
+    - "*.dev.devops.cloudsmesh.be"
+    - "dev.devops.cloudsmesh.be"

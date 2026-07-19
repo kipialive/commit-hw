@@ -1,0 +1,17 @@
+{{- if .Values.devCertificate }}
+## Wildcard TLS Certificate for *.dev.devops.cloudsmesh.be
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.devCertificate.name }}
+  namespace: {{ .Values.devCertificate.namespace }}
+spec:
+  secretName: {{ .Values.devCertificate.secretName }}
+  issuerRef:
+    name: {{ .Values.clusterIssuer.name }}
+    kind: ClusterIssuer
+  dnsNames:
+    {{- range .Values.devCertificate.dnsNames }}
+    - {{ . | quote }}
+    {{- end }}
+{{- end }}
