@@ -73,6 +73,12 @@ resource "google_compute_region_network_endpoint_group" "traefik_psc_neg" {
 
   # Link the NEG directly to the published Service Attachment URI in Project B
   psc_target_service = google_compute_service_attachment.traefik_psc_attachment.id
+
+  lifecycle {
+    replace_triggered_by = [
+      google_compute_service_attachment.traefik_psc_attachment,
+    ]
+  }
 }
 
 ################################################################################

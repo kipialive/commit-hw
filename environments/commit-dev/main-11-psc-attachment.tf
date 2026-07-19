@@ -54,6 +54,7 @@ resource "terraform_data" "traefik_ilb_allow_global_access" {
     local.traefik_forwarding_rule,
     var.gcp_project_b_id,
     var.gcp_region,
+    "recreate-service-attachment-after-global-access-v1",
   ]
 
   provisioner "local-exec" {
@@ -69,6 +70,10 @@ resource "google_compute_service_attachment" "traefik_psc_attachment" {
   region      = var.gcp_region
   description = "PSC Service Attachment for Traefik Ingress ILB in Project B"
 
+  depends_on = [
+    terraform_data.traefik_ilb_allow_global_access,
+  ]
+
   # Settings for automatically accepting connections from Project A
   connection_preference = "ACCEPT_AUTOMATIC"
 
@@ -82,6 +87,10 @@ resource "google_compute_service_attachment" "traefik_psc_attachment" {
   nat_subnets = [module.vpc_b.subnets[local.psc_nat_subnet_key].self_link]
 
   lifecycle {
+    replace_triggered_by = [
+      terraform_data.traefik_ilb_allow_global_access,
+    ]
+
     precondition {
       condition     = data.google_compute_forwarding_rule.traefik_ilb.load_balancing_scheme == "INTERNAL"
       error_message = "The Traefik forwarding rule must be an internal load balancer forwarding rule."

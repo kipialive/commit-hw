@@ -38,7 +38,13 @@ resource "google_compute_forwarding_rule" "traefik_psc_endpoint" {
   load_balancing_scheme = ""
 
   # Bind the reserved static internal IP address
-  ip_address            = google_compute_address.traefik_psc_endpoint_ip.id
+  ip_address = google_compute_address.traefik_psc_endpoint_ip.id
+
+  lifecycle {
+    replace_triggered_by = [
+      google_compute_service_attachment.traefik_psc_attachment,
+    ]
+  }
 }
 
 ################################################################################
