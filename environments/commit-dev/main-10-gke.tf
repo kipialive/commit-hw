@@ -22,16 +22,16 @@ Based on source:: https://github.com/terraform-google-modules/terraform-google-k
 ################################################################################
 
 locals {
-  gke_node_machine_type   = "e2-medium"               # 2 vCPU, 4 GB RAM, x86_64 - Absolute minimum allowed for GKE Standard
-  image_type              = "COS_CONTAINERD"          # Container-Optimized OS from Google
+  gke_node_machine_type = "e2-medium"      # 2 vCPU, 4 GB RAM, x86_64 - Absolute minimum allowed for GKE Standard
+  image_type            = "COS_CONTAINERD" # Container-Optimized OS from Google
   # gke_node_machine_type   = "t2a-standard-1"          # 1 vCPU, 4 GB RAM, ARM - Absolute minimum allowed for GKE Standard
   # image_type              = "COS_ARM64_CONTAINERD"    # ARM Container-Optimized OS from Google
-  
-  gke_cluster_version     = "1.33"
-  
-  gke_min_node_count      = 1                         # Minimum number of nodes per zone in the default node pool
-  gke_max_node_count      = 1                         # Maximum number of nodes per zone in the default node pool
-  gke_zones               = ["${var.gcp_region}-a"]   # GKE Nodes only in ONE Zone
+
+  gke_cluster_version = "1.33"
+
+  gke_min_node_count = 1                       # Minimum number of nodes per zone in the default node pool
+  gke_max_node_count = 1                       # Maximum number of nodes per zone in the default node pool
+  gke_zones          = ["${var.gcp_region}-a"] # GKE Nodes only in ONE Zone
   # gke_zones               = ["${var.gcp_region}-a", "${var.gcp_region}-b"] # Multiple zones
 }
 
@@ -47,21 +47,21 @@ module "gke_standard_cluster" {
 
   kubernetes_version = local.gke_cluster_version
 
-  name       = "${var.env_name_short}-gke-cluster"
-  region     = var.gcp_region
-  zones      = local.gke_zones
-  
+  name   = "${var.env_name_short}-gke-cluster"
+  region = var.gcp_region
+  zones  = local.gke_zones
+
   # Network topology binding to the custom VPC B module outputs
   network    = module.vpc_b.network_name
   subnetwork = "${var.env_name_short}-subnet-b" # Resolves to commit-dev-subnet-b
-   
+
   # Mapping secondary IP ranges for Kubernetes internal networking
   ip_range_pods     = "gke-pods-range"
   ip_range_services = "gke-services-range"
 
   # Production hardening: Complete isolation of worker nodes from the public internet
-  enable_private_nodes    = true
-  enable_private_endpoint = false # Control Plane API remains accessible via secure authorized networks
+  enable_private_nodes          = true
+  enable_private_endpoint       = false # Control Plane API remains accessible via secure authorized networks
   deploy_using_private_endpoint = false
 
   # Master Authorized Networks configuration for secure API access
@@ -73,7 +73,7 @@ module "gke_standard_cluster" {
   ]
 
   # Production safety guardrails
-  deletion_protection = true
+  deletion_protection      = true
   remove_default_node_pool = true # Best practice: destroy default pool and use custom node pools
 
   ################################################################################

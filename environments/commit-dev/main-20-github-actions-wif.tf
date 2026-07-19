@@ -49,7 +49,7 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
 resource "google_service_account_iam_member" "wif_sa_binding" {
   service_account_id = "projects/${var.gcp_project_b_id}/serviceAccounts/tf-gke-commit-dev-gke--tvos@${var.gcp_project_b_id}.iam.gserviceaccount.com"
   role               = "roles/iam.workloadIdentityUser"
-  
+
   # Only allows pushes from your specific GitHub repository to assume this role
   member = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/kipialive/commit-hw"
 }

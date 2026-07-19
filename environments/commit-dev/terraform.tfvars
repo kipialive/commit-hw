@@ -2,12 +2,12 @@ gcp_project_a_id = "project-0895aaca-3d6c-4e15-b58"
 gcp_project_b_id = "supple-lock-502820-g3"
 
 ### Council Bluffs, Iowa, USA
-gcp_region  = "us-central1"
-gcp_zone    = "us-central1-a"
+gcp_region = "us-central1"
+gcp_zone   = "us-central1-a"
 
-env_name              = "commit-dev-tf-main-env"
-env_name_short        = "commit-dev"
-git_branch_env_name   = "main"
+env_name            = "commit-dev-tf-main-env"
+env_name_short      = "commit-dev"
+git_branch_env_name = "main"
 
 ###### ###### ###### ###### ###### ###### 
 ### VPC "A" CommIT - CIDR blocks/range ###
@@ -20,10 +20,10 @@ vpc_a_subnet_cidr = "10.10.0.0/16"
 ###### ###### ###### ###### ###### ###### 
 
 # Main subnet for GKE nodes
-vpc_b_subnet_cidr     = "10.20.0.0/16"
+vpc_b_subnet_cidr = "10.20.0.0/16"
 
 # Noted: Moved outside of 10.20.0.0/16 to avoid overlapping subnets conflict
-vpc_b_psc_nat_cidr    = "10.30.0.0/24"
+vpc_b_psc_nat_cidr = "10.30.0.0/24"
 
 # Using a dedicated non-overlapping block for the Regional Managed Proxy
 vpc_b_proxy_only_cidr = "10.129.0.0/23"
@@ -32,5 +32,5 @@ vpc_b_proxy_only_cidr = "10.129.0.0/23"
 ### GKE - CIDR blocks/range  ###
 ###### ###### ###### ###### ###### ###### 
 
-gke_pod_cidr_range      = "172.16.0.0/16"
-gke_service_cidr_range  = "172.17.0.0/20"
+gke_pod_cidr_range     = "172.16.0.0/16"
+gke_service_cidr_range = "172.17.0.0/20"

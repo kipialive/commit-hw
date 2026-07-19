@@ -59,8 +59,8 @@ resource "google_compute_firewall" "vpc_b_allow_internal" {
   network     = "${var.env_name_short}-vpc-b"
   description = "Allow internal traffic between GKE nodes, pods, and services within VPC B"
 
-  direction     = "INGRESS"
-  priority      = 1010
+  direction = "INGRESS"
+  priority  = 1010
   source_ranges = [
     var.vpc_b_subnet_cidr,
     var.gke_pod_cidr_range,

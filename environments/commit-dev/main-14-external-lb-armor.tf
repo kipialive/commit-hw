@@ -109,9 +109,9 @@ module "external_lb" {
   # Backend Architecture definition mapping directly to our PSC NEG configuration
   backends = {
     traefik-psc-backend = {
-      protocol    = "HTTP"
-      port_name   = "http"
-      description = "PSC dynamic backend routing to Traefik internal proxy"
+      protocol    = "HTTPS"
+      port_name   = "https"
+      description = "PSC dynamic backend routing to Traefik internal HTTPS proxy"
 
       # Bind the Cloud Armor policy to this specific backend routing path
       security_policy = google_compute_security_policy.cloud_armor_policy.self_link
