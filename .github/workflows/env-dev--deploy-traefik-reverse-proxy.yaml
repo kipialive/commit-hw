@@ -58,6 +58,8 @@ jobs:
       TRAEFIK_CHART_SEARCH_DEPTH: "1"
       TRAEFIK_CHART_ARCHIVE_LIMIT: "1"
       KUBECTL_LOG_TAIL_LINES: "50"
+      HELM_ROLLBACK_ON_FAILURE_FLAG: "--rollback-on-failure"
+      HELM_ATOMIC_FLAG: "--atomic"
 
     steps:
       # Step 1: Print who triggered this build (whoami)
@@ -178,12 +180,17 @@ jobs:
             CHART_TO_USE="${CHART_DIR}"
           fi
 
+          HELM_FAILURE_FLAG="${HELM_ROLLBACK_ON_FAILURE_FLAG}"
+          if ! helm upgrade --help | grep -q -- "${HELM_FAILURE_FLAG}"; then
+            HELM_FAILURE_FLAG="${HELM_ATOMIC_FLAG}"
+          fi
+
           echo "Deploying Helm chart from: ${CHART_TO_USE} with values: ${CHART_VALUES}"
           helm upgrade --install "${TRAEFIK_RELEASE_NAME}" "${CHART_TO_USE}" \
             --namespace "${NAMESPACE}" \
             --create-namespace \
             -f "${CHART_VALUES}" \
-            --rollback-on-failure --wait --timeout="${HELM_TIMEOUT}"
+            "${HELM_FAILURE_FLAG}" --wait --timeout="${HELM_TIMEOUT}"
 
           echo "Current Traefik Reverse pods:"
           kubectl get pods -n "${NAMESPACE}" -o wide
