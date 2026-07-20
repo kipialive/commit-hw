@@ -10,6 +10,20 @@ The project builds a two-perimeter GCP setup:
 - Project B: private GKE Standard cluster, internal Traefik LoadBalancer and the demo API workload.
 - Traffic path: user -> Google External HTTPS LB -> PSC -> Traefik `websecure` -> `commit-api` Service over HTTPS -> pod HTTPS listener.
 
+##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
+### Full Flow ###
+##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
+
+DNS Cloudflare DNS-only
+-> Google External HTTPS LB
+-> Google-managed SSL
+-> PSC NEG
+-> PSC Service Attachment
+-> GKE Internal LoadBalancer
+-> Traefik websecure
+-> commit-api Service HTTPS
+-> nginx pod HTTPS
+
 ## Manual DNS Step
 
 The domain `cloudsmesh.be` is managed in Cloudflare. Create this DNS record manually:
