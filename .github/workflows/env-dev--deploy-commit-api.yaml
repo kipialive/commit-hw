@@ -1,0 +1,130 @@
+## .github/workflows/env-dev--deploy-commit-api.yaml
+name: Deploy Commit API Application to GKE
+
+on:
+  push:
+    branches:
+      # - never-trigger-this-branch
+      - main
+    paths:
+      - ".github/helm-charts/env-dev/commit-api/**"
+      - ".github/workflows/env-dev--deploy-commit-api.yaml"
+  workflow_dispatch:
+    inputs:
+      gke_cluster_name:
+        description: 'GKE Cluster Name'
+        required: true
+        type: string
+        default: 'commit-dev-gke-cluster'
+
+  workflow_call:
+    inputs:
+      gke_cluster_name:
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+env:
+  ENVIRONMENT: commit-dev
+  GCP_PROJECT_ID: ${{ secrets.COMMIT_HW_GCP_PROJECT_ID_B }}
+  GCP_REGION: ${{ secrets.COMMIT_HW_GCP_REGION_DEV }}
+  GKE_CLUSTER: ${{ github.event.inputs.gke_cluster_name || inputs.gke_cluster_name || 'commit-dev-gke-cluster' }}
+  GCP_PROJECT_NUMBER: ${{ secrets.COMMIT_HW_GCP_PROJECT_B_NUMBER }}
+  GCP_SERVICE_ACCOUNT: ${{ secrets.COMMIT_HW_GCP_SERVICE_ACCOUNT_PROJECT_B }}
+
+jobs:
+  deploy-commit-api:
+    name: Deploy Commit API Application to GKE
+    runs-on: ubuntu-24.04
+    environment: commit-dev
+
+    # Declare environment variables for the current job
+    env:
+      RELEASE_NAME: commit-api
+      NAMESPACE: commit-api
+      CHART_DIR: .github/helm-charts/env-dev/commit-api
+      CHART_VALUES: .github/helm-charts/env-dev/commit-api/values.yaml
+      KUBECTL_TIMEOUT: 120s
+      HELM_TIMEOUT: 5m
+
+    steps:
+      # Step 1: Print who triggered this build (whoami)
+      - name: Who triggered this build?
+        run: |
+          echo "Triggered by: ${{ github.actor }}"
+
+      # Step 2: Print the caller repo name
+      - name: Print caller repo "CommIT-HW" name
+        run: |
+          echo "CommIT-HW Caller Repo Name is: ${{ github.repository }}"
+
+      # Step 3: Checkout the repository code (This ensures the GitHub Actions runner has access to your repo)
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      # Step 4: Authenticate to Google Cloud via OIDC provider without static service account keys
+      - name: Authenticate to Google Cloud via OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          # GitHub Actions → GCP Workload Identity Federation exchange
+          workload_identity_provider: "projects/${{ env.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
+
+      # Step 5: Fetch GKE cluster access credentials and automatically configure local kubeconfig
+      - name: Set up Cloud SDK and Configure GKE kubeconfig
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: "${{ env.GKE_CLUSTER }}"
+          location: "${{ env.GCP_REGION }}"
+          project_id: "${{ env.GCP_PROJECT_ID }}"
+
+      # Step 6: Perform a smoke test to ensure direct connectivity to the private GKE control plane
+      - name: Verify cluster connectivity
+        run: |
+          set -euo pipefail
+          kubectl get nodes
+      
+      # Step 7: Validate local wrapper chart via Helm Lint validation rules
+      - name: Helm lint
+        run: |
+          set -euo pipefail
+          helm lint "${CHART_DIR}" -f "${CHART_VALUES}"
+
+      # Step 8: Execute Helm dry-run rendering execution test
+      - name: Helm template dry run
+        run: |
+          set -euo pipefail
+          helm template "${RELEASE_NAME}" "${CHART_DIR}" \
+            --namespace "${NAMESPACE}" \
+            -f "${CHART_VALUES}"
+
+      # Step 9: Deploy Commit API Application to GKE
+      - name: Deploy Commit API Application via Helm
+        run: |
+          set -euo pipefail
+          helm upgrade --install "${RELEASE_NAME}" "${CHART_DIR}" \
+            --namespace "${NAMESPACE}" \
+            --create-namespace \
+            -f "${CHART_VALUES}" \
+            --atomic --wait --timeout="${HELM_TIMEOUT}"
+
+      # Step 10: Run post-deployment deployment rollout status validation loop
+      - name: Verify rollout and route resources
+        run: |
+          set -euo pipefail
+          kubectl rollout status deployment/"${RELEASE_NAME}" -n "${NAMESPACE}" --timeout="${KUBECTL_TIMEOUT}"
+          kubectl get svc,ingressroute,serverstransport -n "${NAMESPACE}" -o wide
+
+      # Step 10: Run smoke test HTTPS inside the GKE cluster
+      - name: Smoke test HTTPS inside the cluster
+        run: |
+          set -euo pipefail
+          kubectl run commit-api-curl-${GITHUB_RUN_ID} \
+            --namespace "${NAMESPACE}" \
+            --rm -i --restart=Never \
+            --image=curlimages/curl:8.11.1 \
+            --command -- curl -kfsS "https://${RELEASE_NAME}.${NAMESPACE}.svc.cluster.local/healthz"

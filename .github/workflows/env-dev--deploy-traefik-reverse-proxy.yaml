@@ -85,7 +85,7 @@ jobs:
           service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
 
       # Step 5: Fetch GKE cluster access credentials and automatically configure local kubeconfig
-      - name: Set up Cloud SDK and Configure kubeconfig
+      - name: Set up Cloud SDK and Configure GKE kubeconfig
         uses: google-github-actions/get-gke-credentials@v2
         with:
           cluster_name: "${{ env.GKE_CLUSTER }}"

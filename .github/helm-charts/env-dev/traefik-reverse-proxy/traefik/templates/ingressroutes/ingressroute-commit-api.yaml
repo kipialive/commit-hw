@@ -1,0 +1,27 @@
+---
+## .github/helm-charts/env-dev/traefik-reverse-proxy/traefik/templates/ingressroutes/ingressroute-commit-api.yaml
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: commit-api
+  namespace: commit-api
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    meta.helm.sh/release-name: traefik-reverse-proxy
+    meta.helm.sh/release-namespace: traefik-reverse-proxy
+spec:
+  entryPoints:
+    # - web
+    - websecure
+  routes:
+    - match: Host(`api.commit-dev.cloudsmesh.be`)
+      kind: Rule
+      services:
+        - name: commit-api
+          port: 443
+          scheme: https
+          serversTransport: commit-api-transport
+  tls:
+    secretName: commit-api-edge-tls
+    # certResolver: commit-hw-dev

@@ -1,0 +1,32 @@
+## .github/helm-charts/env-dev/commit-api/values.yaml
+namespace: commit-api
+
+replicaCount: 1
+
+image:
+  repository: nginx
+  tag: 1.29-alpine
+  pullPolicy: IfNotPresent
+
+service:
+  port: 443
+  targetPort: 8443
+
+ingressRoute:
+  enabled: true
+  host: api.commit-dev.cloudsmesh.be
+  entryPoint: websecure
+  edgeTlsSecretName: commit-api-edge-tls
+  serversTransportName: commit-api-transport
+
+tls:
+  appSecretName: commit-api-app-tls
+  durationDays: 365
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi

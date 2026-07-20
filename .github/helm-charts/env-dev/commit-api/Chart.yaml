@@ -1,0 +1,7 @@
+## .github/helm-charts/env-dev/commit-api/Chart.yaml
+apiVersion: v2
+name: commit-api
+description: HTTPS demo API workload for the CommIT homework environment
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

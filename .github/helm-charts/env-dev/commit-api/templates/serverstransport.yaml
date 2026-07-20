@@ -1,0 +1,9 @@
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: {{ .Values.ingressRoute.serversTransportName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "commit-api.labels" . | nindent 4 }}
+spec:
+  insecureSkipVerify: true
