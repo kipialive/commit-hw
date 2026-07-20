@@ -1160,7 +1160,9 @@ traefik:
     # clusterIP: "2.3.4.5"
     # loadBalancerSourceRanges: []
     loadBalancerSourceRanges:
-      - 10.20.0.0/16          # GCP VPC B CIDR range
+      - 10.10.0.0/16          # GCP VPC 'A' CIDR range
+      - 10.20.0.0/16          # GCP VPC 'B' CIDR range
+      - 10.30.0.0/24          # GCP VPC 'B' CIDR range PSC NAT
       # - 0.0.0.0/0           # For Debug ONLY
   
     # - 192.168.0.1/32
