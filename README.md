@@ -1,6 +1,6 @@
 # commit-hw
 
-CommIT homework infrastructure for the `commit-dev` environment.
+CommIT homework infrastructure for the `commit-dev` environment. 
 
 ## Status
 
