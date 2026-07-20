@@ -1,0 +1,28 @@
+## .github/helm-charts/env-dev/traefik-reverse-proxy/traefik/templates/ingressroutes/ingressroute-uptime-kuma.yaml
+## Traefik IngressRoute for Uptime Kuma (HTTP/HTTPS Endpoint Monitoring + Web UI)
+## Uses cross-namespace service reference (allowCrossNamespace: true in Traefik values)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: uptime-kuma
+  namespace: traefik-reverse-proxy
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    meta.helm.sh/release-name: traefik-reverse-proxy
+    meta.helm.sh/release-namespace: traefik-reverse-proxy
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`uptime.dev.cloudsmesh.be`)
+      kind: Rule
+      middlewares:
+        - name: traefik-dashboard-auth
+          namespace: traefik-reverse-proxy
+      services:
+        - name: uptime-kuma
+          namespace: monitoring
+          port: 3001
+  tls:
+    secretName: dev-cloudsmesh-be-prod-tls

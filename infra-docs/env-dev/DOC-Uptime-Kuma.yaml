@@ -1,0 +1,293 @@
+##### ##### ##### ##### ##### ##### ##### #####
+### DOC-Uptime-Kuma.yaml ###
+### Phase 3d: External Monitoring (Uptime Kuma) ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# Links
+
+# - [Uptime Kuma](https://uptime.kuma.pet/)
+#   - [GitHub](https://github.com/louislam/uptime-kuma)
+#   - [Helm Chart](https://github.com/dirsigler/uptime-kuma-helm) (chart v2.24.0, app v2.2.1, repo: https://helm.irsigler.cloud)
+
+# Related files:
+#   Uptime Kuma pipeline:    .github/workflows/env-dev--installation-uptime-kuma.yaml
+#   Uptime Kuma values:      .github/helm-charts/env-dev/uptime-kuma/values.yaml
+#   IngressRoute:            .github/helm-charts/env-dev/traefik-reverse-proxy/traefik/templates/ingressroutes/ingressroute-uptime-kuma.yaml
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Architecture ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# Uptime Kuma runs inside the cluster as a single-replica Deployment.
+# It monitors all *.dev.cloudsmesh.be endpoints via HTTP/HTTPS probes from within the cluster,
+# catching Traefik routing, DNS resolution, and TLS certificate issues.
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Status ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# Check Uptime Kuma pod:
+# kubectl get pods -n monitoring -l app.kubernetes.io/name=uptime-kuma -o wide
+
+# Check Uptime Kuma logs:
+# kubectl logs -n monitoring -l app.kubernetes.io/name=uptime-kuma --tail=50
+
+# Check service:
+# kubectl get svc -n monitoring -l app.kubernetes.io/name=uptime-kuma
+
+# Check PVC:
+# kubectl get pvc -n monitoring -l app.kubernetes.io/name=uptime-kuma
+
+# Check Helm release:
+# helm list -n monitoring | grep uptime-kuma
+
+# Check IngressRoute:
+# kubectl get ingressroute -n traefik-reverse-proxy uptime-kuma -o yaml
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Upgrade ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# 1. Check latest chart version:
+#    helm repo update uptime-kuma
+#    helm search repo uptime-kuma/uptime-kuma --versions | head -5
+#
+# 2. Update values.yaml image.tag if needed (default: "1" = latest stable)
+#
+# 3. Re-run pipeline:
+#    GitLab → CI/CD → Pipelines → env-jit--installation-uptime-kuma.yaml → Run
+#
+# 4. Verify: monitors still active + data retained (PVC persists across upgrades)
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Post-Deploy: Telegram Notification Setup ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# Uptime Kuma does NOT support configuration-as-code, REST API, or CLI
+# for managing monitors and notifications. All setup is done via the Web UI.
+# Data is persisted in embedded MariaDB on the PVC — survives restarts and upgrades.
+#
+# 1. Open https://uptime.dev.cloudsmesh.be
+# 2. Click profile icon (top-right) → Settings → Notifications
+# 3. Click "Setup Notification" → select "Telegram"
+# 4. Fill in:
+#    - Friendly Name: JIT Telegram Bot
+#    - Bot Token: same TELEGRAM_BOT_TOKEN used by Alertmanager (from Infisical, env: jit)
+#    - Chat ID: same chat ID used by Alertmanager
+# 5. Click "Test" → verify Telegram message received
+# 6. Enable "Default Enabled" → all new monitors will use this notification automatically
+# 7. Click "Save"
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Post-Deploy: Add Monitors ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# For each endpoint: click "+ Add New Monitor" in the Web UI.
+#
+# General settings for all HTTP(s) monitors:
+#   - Heartbeat Interval: 60 seconds
+#   - Retries: 3
+#   - Retry Interval: 30 seconds
+#   - Timeout: 10 seconds
+#
+# ⚠️ NOTE: Some endpoints are protected by Authentik Forward Auth (SSO).
+#   Unauthenticated requests get HTTP 302 redirect to Authentik login.
+#   For these monitors: set Accepted Status Codes to "200-399".
+#   For endpoints with health APIs: use the health URL with "200-299".
+
+##### ##### ##### ##### #####
+### Group 1: Health Check Endpoints (most reliable — bypass SSO) ###
+##### ##### ##### ##### #####
+
+# These endpoints return JSON health data, no authentication needed.
+# Monitor Type: HTTP(s) | Accepted Status Codes: 200-299
+#
+# ┌────┬───────────────────────────────────────────────────────────────┬──────────────────────────────┬───────────┐
+# │ #  │ URL                                                           │ Name                         │ Expected  │
+# ├────┼───────────────────────────────────────────────────────────────┼──────────────────────────────┼───────────┤
+# │  1 │ https://grafana.dev.cloudsmesh.be/api/health          │ Grafana (Health API)         │ 200 JSON  │
+# │  2 │ https://infisical.dev.cloudsmesh.be/api/status        │ Infisical (Health API)       │ 200 JSON  │
+# │  3 │ https://n8n.dev.cloudsmesh.be/healthz                 │ n8n (Health)                 │ 200       │
+# │  4 │ https://n8n.dev.cloudsmesh.be/form/jit-access         │ JIT Portal (Public Form)     │ 200 HTML  │
+# │  5 │ https://authentik.dev.cloudsmesh.be/-/health/ready/   │ Authentik (Health API)       │ 200       │
+# │  6 │ https://teleport.dev.cloudsmesh.be/webapi/ping        │ Teleport (Ping API)          │ 200 JSON  │
+# └────┴───────────────────────────────────────────────────────────────┴──────────────────────────────┴───────────┘
+
+##### ##### ##### ##### #####
+### Group 2: SSO-Protected Endpoints (return 302 when not authenticated) ###
+##### ##### ##### ##### #####
+
+# These endpoints are behind Authentik Forward Auth.
+# Unauthenticated probe → 302 redirect to Authentik login.
+# Monitor Type: HTTP(s) | Accepted Status Codes: 200-399
+#
+# ┌────┬───────────────────────────────────────────────────────────────┬──────────────────────────────┬───────────┐
+# │ #  │ URL                                                           │ Name                         │ Expected  │
+# ├────┼───────────────────────────────────────────────────────────────┼──────────────────────────────┼───────────┤
+# │  7 │ https://alertmanager.dev.cloudsmesh.be                │ Alertmanager (SSO)           │ 302       │
+# │  8 │ https://coroot.dev.cloudsmesh.be                      │ Coroot (SSO)                 │ 302       │
+# │  9 │ https://mailpit.dev.cloudsmesh.be                     │ Mailpit (SSO)                │ 302       │
+# │ 10 │ https://goldilocks.dev.cloudsmesh.be                  │ Goldilocks (SSO)             │ 302       │
+# │ 11 │ https://victoriametrics.dev.cloudsmesh.be             │ VictoriaMetrics VMUI (SSO)   │ 302       │
+# │ 12 │ https://victorialogs.dev.cloudsmesh.be                │ VictoriaLogs VMUI (SSO)      │ 302       │
+# │ 13 │ https://opencost.dev.cloudsmesh.be                    │ OpenCost (SSO)               │ 302       │
+# │ 14 │ https://uptime.dev.cloudsmesh.be                      │ Uptime Kuma (SSO, self-mon)  │ 302       │
+# └────┴───────────────────────────────────────────────────────────────┴──────────────────────────────┴───────────┘
+#
+# NOTE on self-monitoring (#14): Uptime Kuma monitoring itself is useful —
+# if the IngressRoute or Traefik breaks, the probe fails even though the pod is healthy.
+
+##### ##### ##### ##### #####
+### Group 3: SSL Certificate Monitors ###
+##### ##### ##### ##### #####
+
+# SSL certificate expiry is configured GLOBALLY, not per-monitor:
+#   Settings → Notifications → TLS Certificate Expiry
+#   Add thresholds: 7 days, 14 days, 21 days
+#   → Save
+#
+# Domain expiry is also configured here:
+#   Settings → Notifications → Domain Expiry
+#   Add thresholds: 7 days, 14 days, 21 days
+#   → Save
+#
+# Then on each monitor, enable the checkbox:
+#   - "Certificate Expiry Notification" — ON
+#   - "Domain Name Expiry Notification" — ON (optional but recommended)
+#
+# cert-manager auto-renews at 30 days, so the 21-day threshold is a safety net,
+# 14-day is a warning, and 7-day is critical.
+#
+# Uptime Kuma checks SSL expiry on every HTTPS probe automatically.
+
+##### ##### ##### ##### #####
+### Monitor creation step-by-step ###
+##### ##### ##### ##### #####
+
+# For each row in Group 1 + Group 2:
+#   1. Click "+ Add New Monitor"
+#   2. Monitor Type: HTTP(s)
+#   3. Friendly Name: <Name from table>
+#   4. URL: <URL from table>
+#   5. Heartbeat Interval: 60
+#   6. Retries: 3
+#   7. Accepted Status Codes:
+#        Group 1: 200-299
+#        Group 2: 200-399
+#   8. Certificate Expiry Notification: ON, 14 days
+#   9. Tags (optional): "health-api" for Group 1, "sso-protected" for Group 2
+#  10. Click "Save"
+#
+# Total: 14 monitors
+
+##### ##### ##### ##### #####
+### Post-setup verification ###
+##### ##### ##### ##### #####
+
+# After adding all 14 monitors:
+#   1. Wait 2 minutes for all probes to run at least once
+#   2. Verify: all monitors show green "Up" status on the dashboard
+#   3. Test Telegram: temporarily stop a service (e.g., scale Mailpit to 0 replicas):
+#        kubectl scale deploy -n mailpit mailpit --replicas=0
+#      → wait ~60s → Telegram alert should fire
+#      → restore: kubectl scale deploy -n mailpit mailpit --replicas=1
+#   4. Verify SSL: click any monitor → check "Certificate Info" section shows expiry date
+#
+# NOTE: Adding new services in the future requires manually adding a monitor
+# in the Web UI. There is no automation path for this (no API/CLI/config-as-code).
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Tests ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# ─── Test 1: Pod is running ───
+# Command:
+#   kubectl get pods -n monitoring -l app.kubernetes.io/name=uptime-kuma -o wide
+# Expected:
+#   NAME                          READY   STATUS    RESTARTS   AGE
+#   uptime-kuma-xxxxxxxxx-xxxxx   1/1     Running   0          Xm
+
+# ─── Test 2: Service is accessible ───
+# Command:
+#   kubectl get svc -n monitoring uptime-kuma
+# Expected:
+#   NAME          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+#   uptime-kuma   ClusterIP   10.100.xxx.xxx   <none>        3001/TCP   Xm
+
+# ─── Test 3: PVC is bound ───
+# Command:
+#   kubectl get pvc -n monitoring -l app.kubernetes.io/name=uptime-kuma
+# Expected:
+#   NAME          STATUS   VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+#   uptime-kuma   Bound    pvc-xxx   4Gi        RWO            gp3            Xm
+
+# ─── Test 4: Web UI reachable via port-forward ───
+# Command:
+#   kubectl port-forward -n monitoring svc/uptime-kuma 3001:3001 &
+#   curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/
+# Expected:
+#   200
+
+# ─── Test 5: IngressRoute exists ───
+# Command:
+#   kubectl get ingressroute -n traefik-reverse-proxy uptime-kuma
+# Expected:
+#   NAME          AGE
+#   uptime-kuma   Xm
+
+# ─── Test 6: Web UI accessible via domain ───
+# Command:
+#   curl -sI https://uptime.dev.cloudsmesh.be/ | head -5
+# Expected:
+#   HTTP/2 200 (or 302 redirect to Authentik SSO login)
+
+# ─── Test 7: Helm release is deployed ───
+# Command:
+#   helm list -n monitoring | grep uptime-kuma
+# Expected:
+#   uptime-kuma   monitoring   1   2026-04-10 ...   deployed   uptime-kuma-2.24.0   2.2.1
+
+# ─── Test 8: Resource limits applied ───
+# Command:
+#   kubectl get pod -n monitoring -l app.kubernetes.io/name=uptime-kuma -o jsonpath='{.items[0].spec.containers[0].resources}'
+# Expected:
+#   {"limits":{"cpu":"200m","memory":"256Mi"},"requests":{"cpu":"30m","memory":"64Mi"}}
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Troubleshooting ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# Problem: Pod stuck in Pending
+# Cause: PVC not provisioning (gp3 StorageClass missing or EBS CSI driver not installed)
+# Fix: kubectl describe pvc -n monitoring uptime-kuma → check events
+
+# Problem: Web UI shows 404 or 503
+# Cause: IngressRoute not deployed or service name mismatch
+# Fix: kubectl get ingressroute -n traefik-reverse-proxy uptime-kuma -o yaml
+#       → verify service name = "uptime-kuma", port = 3001, namespace = "monitoring"
+
+# Problem: Telegram notifications not working
+# Cause: Bot token not configured in Uptime Kuma Web UI
+# Fix: Settings → Notifications → Add Telegram → paste bot token and chat ID
+#      (reuse @jit_access_portal_bot token and chat from Alertmanager setup)
+
+# Problem: Monitors show DOWN from inside cluster but services work externally
+# Cause: DNS resolution or Traefik routing issue within the cluster
+# Fix: kubectl exec -n monitoring <pod> -- wget -qO- --timeout=5 https://<endpoint>/ 2>&1
+#      → check DNS resolution and certificate errors
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Uninstallation ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# helm uninstall uptime-kuma -n monitoring
+# kubectl delete pvc -n monitoring -l app.kubernetes.io/name=uptime-kuma
+# kubectl delete ingressroute -n traefik-reverse-proxy uptime-kuma
+
+##### ##### ##### ##### ##### ##### ##### #####
+### Resources ###
+##### ##### ##### ##### ##### ##### ##### #####
+
+# Uptime Kuma docs:           https://github.com/louislam/uptime-kuma/wiki
+# Helm chart source:          https://github.com/dirsigler/uptime-kuma-helm
+# Helm chart values ref:      https://github.com/dirsigler/uptime-kuma-helm/blob/main/charts/uptime-kuma/values.yaml

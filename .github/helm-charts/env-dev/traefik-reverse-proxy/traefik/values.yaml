@@ -1089,7 +1089,7 @@ traefik:
   # nameOverride: traefik
   # fullnameOverride: traefik-reverse-proxy
   
-  # Service exposed as LoadBalancer on EKS
+  # Service exposed as LoadBalancer on GKE
   service:
     enabled: true
     ## -- Single service is using `MixedProtocolLBService` feature gate.

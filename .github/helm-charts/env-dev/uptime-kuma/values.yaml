@@ -1,0 +1,31 @@
+## Uptime Kuma Helm values for CommIT HW Dev environment
+## Chart: uptime-kuma/uptime-kuma (https://helm.irsigler.cloud)
+## HTTP/HTTPS endpoint monitoring with Web UI + Telegram notifications
+##
+## Web UI: https://uptime.dev.cloudsmesh.be (Forward Auth SSO)
+## Telegram: built-in notification — reuse @jit_access_portal_bot
+## Monitors all *.dev.cloudsmesh.be endpoints from inside the cluster
+
+fullnameOverride: uptime-kuma
+
+image:
+  tag: "2.2.1"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3001
+
+volume:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  storageClassName: gp3
+
+resources:
+  requests:
+    cpu: 30m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
