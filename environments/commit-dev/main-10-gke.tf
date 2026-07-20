@@ -30,7 +30,7 @@ locals {
   gke_cluster_version = "1.33"
 
   gke_min_node_count = 1                       # Minimum number of nodes per zone in the default node pool
-  gke_max_node_count = 1                       # Maximum number of nodes per zone in the default node pool
+  gke_max_node_count = 2                       # Maximum number of nodes per zone in the default node pool
   gke_zones          = ["${var.gcp_region}-a"] # GKE Nodes only in ONE Zone
   # gke_zones               = ["${var.gcp_region}-a", "${var.gcp_region}-b"] # Multiple zones
 }

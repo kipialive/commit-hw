@@ -4,8 +4,8 @@ name: Deploy Commit API Application to GKE
 on:
   push:
     branches:
-      # - never-trigger-this-branch
-      - main
+      - never-trigger-this-branch
+      # - main
     paths:
       - ".github/helm-charts/env-dev/commit-api/**"
       - ".github/workflows/env-dev--deploy-commit-api.yaml"
