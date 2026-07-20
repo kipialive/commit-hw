@@ -144,6 +144,58 @@ via: 1.1 google
 
 Sealed Secrets controller is installed in GKE. It is used for the Traefik Dashboard basic-auth secret.
 
+## cert-manager
+
+Public API:
+api.commit-dev.cloudsmesh.be
+  -> Internet
+  -> Google External HTTPS LB
+  -> Google-managed SSL
+  -> PSC
+  -> Traefik
+  -> commit-api HTTPS service
+
+Private (Internal) platform apps:
+traefik-dashboard.dev.cloudsmesh.be
+coroot.dev.cloudsmesh.be
+  -> Twingate VPN
+  -> private GCP/GKE network
+  -> internal Traefik LoadBalancer
+  -> Traefik IngressRoute
+  -> service
+
+####
+
+cert-manager is configured to issue Let's Encrypt certificates through Cloudflare DNS-01.
+
+The ClusterIssuer expects this Kubernetes Secret in the `cert-manager` namespace:
+
+```text
+Secret: cloudflare-api-token-secret
+Key: api-token
+```
+
+The Cloudflare API token should have permission to edit DNS records for `cloudsmesh.be`.
+
+Temporary plain Secret command for testing:
+
+```bash
+kubectl create secret generic cloudflare-api-token-secret \
+  --namespace cert-manager \
+  --from-literal=api-token='<cloudflare-api-token>'
+```
+
+For GitOps-safe storage, seal the token with Sealed Secrets and commit only the `SealedSecret` manifest.
+
+cert-manager owns these public edge TLS secrets:
+
+```text
+commit-api/commit-api-public-tls
+traefik-reverse-proxy/dev-devops-wildcard-tls
+```
+
+Traefik `IngressRoute` resources reference those secrets through `tls.secretName`.
+
 ## Next Step
 
 Configure cert-manager and certificate handling for Traefik Reverse Proxy resources.
