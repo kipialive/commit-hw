@@ -51,6 +51,17 @@ Target: 136.69.54.142
 Proxy status: DNS only
 ```
 
+Private platform records after Twingate/private access is ready:
+
+```text
+Type: A
+Name: *.dev
+Target: 10.20.0.7
+Proxy status: DNS only
+```
+
+`*.dev.cloudsmesh.be` points to the private Traefik Internal LoadBalancer VIP and is intended for access through Twingate, not directly from the public Internet.
+
 Do not use Cloudflare `Proxied` for `api.commit-dev.cloudsmesh.be` on the free plan. Cloudflare Universal SSL covers `*.cloudsmesh.be`, but not the deeper hostname `api.commit-dev.cloudsmesh.be`. The Google-managed certificate is active when DNS resolves directly to the Google LB IP.
 
 ## GitHub Actions
@@ -147,6 +158,9 @@ Sealed Secrets controller is installed in GKE. It is used for the Traefik Dashbo
 ## cert-manager
 
 Public API:
+api.commit-dev.cloudsmesh.be -> 136.69.54.142
+
+```text
 api.commit-dev.cloudsmesh.be
   -> Internet
   -> Google External HTTPS LB
@@ -154,8 +168,13 @@ api.commit-dev.cloudsmesh.be
   -> PSC
   -> Traefik
   -> commit-api HTTPS service
+```
 
 Private (Internal) platform apps:
+*.dev.cloudsmesh.be -> 10.20.0.7
+Access only via Twingate VPN
+
+```text
 traefik-dashboard.dev.cloudsmesh.be
 coroot.dev.cloudsmesh.be
   -> Twingate VPN
@@ -163,10 +182,9 @@ coroot.dev.cloudsmesh.be
   -> internal Traefik LoadBalancer
   -> Traefik IngressRoute
   -> service
+```
 
-####
-
-cert-manager is configured to issue Let's Encrypt certificates through Cloudflare DNS-01.
+cert-manager is configured to issue Let's Encrypt certificates through Cloudflare DNS-01 for private Traefik platform routes.
 
 The ClusterIssuer expects this Kubernetes Secret in the `cert-manager` namespace:
 
@@ -187,15 +205,17 @@ kubectl create secret generic cloudflare-api-token-secret \
 
 For GitOps-safe storage, seal the token with Sealed Secrets and commit only the `SealedSecret` manifest.
 
-cert-manager owns these public edge TLS secrets:
+cert-manager owns these Traefik TLS secrets:
 
 ```text
-commit-api/commit-api-public-tls
-traefik-reverse-proxy/dev-devops-wildcard-tls
+traefik-reverse-proxy/dev-cloudsmesh-be-staging-tls
+traefik-reverse-proxy/dev-cloudsmesh-be-prod-tls
 ```
 
-Traefik `IngressRoute` resources reference those secrets through `tls.secretName`.
+Traefik private `IngressRoute` resources reference the production secret through `tls.secretName`.
+
+The public API stays on the Google-managed certificate attached to the external Google HTTPS Load Balancer.
 
 ## Next Step
 
-Configure cert-manager and certificate handling for Traefik Reverse Proxy resources.
+Create the Cloudflare DNS-01 token secret, deploy cert-manager resources, and later install Twingate for private access to `*.dev.cloudsmesh.be`.

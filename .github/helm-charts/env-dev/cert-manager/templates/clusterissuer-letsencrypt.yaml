@@ -1,16 +1,22 @@
-## ClusterIssuer for Let's Encrypt production (DNS-01 via Route53)
+{{- range $key, $issuer := .Values.clusterIssuers }}
+{{- if $issuer.enabled }}
+---
+## ClusterIssuer for Let's Encrypt {{ $key }} (DNS-01 via Cloudflare)
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: {{ .Values.clusterIssuer.name }}
+  name: {{ $issuer.name }}
 spec:
   acme:
-    email: {{ .Values.clusterIssuer.email }}
-    server: {{ .Values.clusterIssuer.server }}
+    email: {{ $issuer.email }}
+    server: {{ $issuer.server }}
     privateKeySecretRef:
-      name: {{ .Values.clusterIssuer.privateKeySecret }}
+      name: {{ $issuer.privateKeySecret }}
     solvers:
       - dns01:
-          route53:
-            region: {{ .Values.clusterIssuer.solver.dns01.region }}
-            hostedZoneID: {{ .Values.clusterIssuer.solver.dns01.hostedZoneID }}
+          cloudflare:
+            apiTokenSecretRef:
+              name: {{ $.Values.cloudflare.apiTokenSecretRef.name }}
+              key: {{ $.Values.cloudflare.apiTokenSecretRef.key }}
+{{- end }}
+{{- end }}

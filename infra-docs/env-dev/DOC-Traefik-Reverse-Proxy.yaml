@@ -61,25 +61,29 @@ kubectl -n traefik-reverse-proxy logs deploy/traefik-reverse-proxy
 
 
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ######
-### Route 53 - Create DNS Records in !!! Private Hosted Zone !!! ###
+### Cloudflare DNS + Twingate private access ###
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ######
 
-# traefik-dashboard.dev.commit.cloudsmesh.be | A | Alias to NLB | us-east-1 | k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com
-# grafana.dev.commit.cloudsmesh.be | A | Alias to NLB | us-east-1 | k8s-traefikr-traefikr-cd1228a05a-d2ee17faf6225afa.elb.us-east-1.amazonaws.com
+# Public API:
+# api.commit-dev.cloudsmesh.be | A | 136.69.54.142 | DNS only
+#
+# Private platform apps:
+# *.dev.cloudsmesh.be | A | 10.20.0.7 | DNS only
+#
+# Access to 10.20.0.7 is expected to go through Twingate/private network access.
 
 ###### ###### ###### ###### ###### ######
 ### Tests ###
 ###### ###### ###### ###### ###### ######
 
-dig traefik-dashboard.dev.commit.cloudsmesh.be +short
-curl -I -v https://traefik-dashboard.dev.commit.cloudsmesh.be/dashboard/
-curl -kv https://traefik-dashboard.dev.commit.cloudsmesh.be/dashboard/ 2>&1 | grep -E "subject:|issuer:|expire|CN="
+dig traefik-dashboard.dev.cloudsmesh.be +short
+curl -I -v https://traefik-dashboard.dev.cloudsmesh.be/dashboard/
+curl -kv https://traefik-dashboard.dev.cloudsmesh.be/dashboard/ 2>&1 | grep -E "subject:|issuer:|expire|CN="
 
 
-dig grafana.dev.commit.cloudsmesh.be +short
-curl -I -v https://grafana.dev.commit.cloudsmesh.be/
-curl -kv https://grafana.dev.commit.cloudsmesh.be/ 2>&1 | grep -E "subject:|issuer:|expire|CN="
-
+dig coroot.dev.cloudsmesh.be +short
+curl -I -v https://coroot.dev.cloudsmesh.be/
+curl -kv https://coroot.dev.cloudsmesh.be/ 2>&1 | grep -E "subject:|issuer:|expire|CN="
 
 
 

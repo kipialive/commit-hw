@@ -4,8 +4,8 @@ name: Installation Cert-Manager to GKE
 on:
   push:
     branches:
-      - never-trigger-this-branch
-      # - main
+      # - never-trigger-this-branch
+      - main
   workflow_dispatch:
     inputs:
       gke_cluster_name:
@@ -48,6 +48,8 @@ jobs:
       ERROR_LOG_FILE: "err.log"
       CHART_DIR: ".github/helm-charts/env-dev/cert-manager"
       CHART_VALUES: ".github/helm-charts/env-dev/cert-manager/values.yaml"
+      CLOUDFLARE_TOKEN_SECRET_NAME: "cloudflare-api-token-secret"
+      TRAEFIK_NAMESPACE: "traefik-reverse-proxy"
       WAIT_TIMEOUT: "5m"
       KUBECTL_TIMEOUT: "120s"
 
@@ -161,28 +163,31 @@ jobs:
           echo "Summary of cert-manager resources in namespace ${CERT_MANAGER_NAMESPACE}:"
           kubectl -n "${CERT_MANAGER_NAMESPACE}" get pods,svc,deploy -o wide
 
-      # Step 11: Auto-detect target certificate namespace and ensure it exists
-      - name: Ensure Certificate Target Namespace Exists
+      # Step 11: Ensure Traefik certificate target namespace exists
+      - name: Ensure Traefik Certificate Target Namespace Exists
         run: |
           set -euo pipefail
-          CERT_NS=$(grep 'namespace:' "${CHART_VALUES}" | grep -v '#' | head -1 | awk '{print $2}')
-          echo "Certificate target namespace parsed: ${CERT_NS}"
+          kubectl create namespace "${TRAEFIK_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
-          if kubectl get namespace "${CERT_NS}" >/dev/null 2>&1; then
-            echo "Namespace ${CERT_NS} already exists."
-          else
-            echo "Creating namespace ${CERT_NS}..."
-            kubectl create namespace "${CERT_NS}"
+      # Step 12: Verify Cloudflare API token Secret exists for DNS-01
+      - name: Verify Cloudflare DNS-01 Token Secret
+        run: |
+          set -euo pipefail
+          if ! kubectl get secret "${CLOUDFLARE_TOKEN_SECRET_NAME}" -n "${CERT_MANAGER_NAMESPACE}" >/dev/null 2>&1; then
+            echo "❌ ERROR: Missing ${CERT_MANAGER_NAMESPACE}/${CLOUDFLARE_TOKEN_SECRET_NAME}."
+            echo "Create it with key 'api-token' before deploying cert-manager resources."
+            exit 1
           fi
+          echo "✅ Cloudflare API token Secret exists."
 
-      # Step 12: Validate local wrapper chart via Helm Lint validation rules
+      # Step 13: Validate local wrapper chart via Helm Lint validation rules
       - name: Helm Chart Lint Validation
         run: |
           set -euo pipefail
           echo "Linting Helm chart directory: ${CHART_DIR}"
           helm lint "${CHART_DIR}" -f "${CHART_VALUES}"
 
-      # Step 13: Execute Helm dry-run rendering execution test
+      # Step 14: Execute Helm dry-run rendering execution test
       - name: Helm Template Dry-Run Test
         run: |
           set -euo pipefail
@@ -191,7 +196,7 @@ jobs:
             -n "${CERT_MANAGER_NAMESPACE}" \
             -f "${CHART_VALUES}"
 
-      # Step 14: Deploy custom local wrapper application chart containing ClusterIssuer and Certificate
+      # Step 15: Deploy custom local wrapper application chart containing ClusterIssuer and Certificates
       - name: Deploy Custom Cert-Manager Wrapper Chart Resources
         run: |
           set -euo pipefail

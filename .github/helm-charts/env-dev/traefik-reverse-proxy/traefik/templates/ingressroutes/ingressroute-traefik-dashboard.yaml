@@ -10,11 +10,11 @@ spec:
     # - web
     - websecure
   tls:
-    secretName: dev-devops-wildcard-tls
+    secretName: dev-cloudsmesh-be-prod-tls
   routes:
     # Dashboard UI
-    # - match: Host(`traefik-dashboard.dev.commit.cloudsmesh.be`) && (PathPrefix(`/dashboard`))
-    - match: Host(`traefik-dashboard.dev.commit.cloudsmesh.be`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))
+    # - match: Host(`traefik-dashboard.dev.cloudsmesh.be`) && (PathPrefix(`/dashboard`))
+    - match: Host(`traefik-dashboard.dev.cloudsmesh.be`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))
       kind: Rule
       middlewares:
         - name: traefik-dashboard-auth
@@ -24,7 +24,7 @@ spec:
           kind: TraefikService
     
     # # Dashboard API (required for assets/calls)
-    # - match: Host(`traefik-dashboard.dev.commit.cloudsmesh.be`) && PathPrefix(`/api`)
+    # - match: Host(`traefik-dashboard.dev.cloudsmesh.be`) && PathPrefix(`/api`)
     #   kind: Rule
     #   middlewares:
     #     - name: traefik-dashboard-auth
