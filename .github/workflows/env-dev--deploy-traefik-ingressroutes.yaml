@@ -4,8 +4,8 @@ name: Deploy Traefik IngressRoutes to GKE
 on:
   push:
     branches:
-      # - never-trigger-this-branch
-      - main
+      - never-trigger-this-branch
+      # - main
     paths:
       - .github/helm-charts/env-dev/traefik-reverse-proxy/traefik/templates/ingressroutes/**
   workflow_dispatch:
