@@ -2,76 +2,148 @@
 
 CommIT homework infrastructure for the `commit-dev` environment.
 
+## Status
+
+The public API endpoint is working end-to-end:
+
+```text
+https://api.commit-dev.cloudsmesh.be/
+```
+
+Expected response:
+
+```json
+{"status":"ok","service":"commit-api","environment":"commit-dev","transport":"https-all-the-way"}
+```
+
 ## Architecture
 
 The project builds a two-perimeter GCP setup:
 
-- Project A: public perimeter with Cloud Armor, External HTTPS Load Balancer and a PSC NEG.
-- Project B: private GKE Standard cluster, internal Traefik LoadBalancer and the demo API workload.
-- Traffic path: user -> Google External HTTPS LB -> PSC -> Traefik `websecure` -> `commit-api` Service over HTTPS -> pod HTTPS listener.
+- Project A: public perimeter with Cloud Armor, External HTTPS Load Balancer, Google-managed SSL, and a PSC NEG.
+- Project B: private GKE Standard cluster, internal Traefik LoadBalancer, and the `commit-api` workload.
+- CI/CD: GitHub Actions authenticates to GCP through Workload Identity Federation, without static service account keys.
 
-##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
-### Full Flow ###
-##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### 
+Traffic flow:
 
-DNS Cloudflare DNS-only
--> Google External HTTPS LB
--> Google-managed SSL
--> PSC NEG
+```text
+Cloudflare DNS-only
+-> Google External HTTPS Load Balancer
+-> Google-managed SSL certificate
+-> Private Service Connect NEG
 -> PSC Service Attachment
 -> GKE Internal LoadBalancer
--> Traefik websecure
--> commit-api Service HTTPS
--> nginx pod HTTPS
+-> Traefik websecure entryPoint
+-> commit-api Kubernetes Service over HTTPS
+-> nginx pod HTTPS listener
+```
 
-## Manual DNS Step
+## DNS
 
-The domain `cloudsmesh.be` is managed in Cloudflare. Create this DNS record manually:
+The domain `cloudsmesh.be` is managed in Cloudflare.
 
-- Type: `A`
-- Name: `api.commit-dev`
-- Target: `136.69.54.142`
-- Proxy status: DNS only, unless Cloudflare proxying is intentionally part of the test.
+Required record:
 
-After DNS propagation, the Google-managed certificate for `api.commit-dev.cloudsmesh.be` can become active.
+```text
+Type: A
+Name: api.commit-dev
+Target: 136.69.54.142
+Proxy status: DNS only
+```
 
-## Deployment Order
+Do not use Cloudflare `Proxied` for `api.commit-dev.cloudsmesh.be` on the free plan. Cloudflare Universal SSL covers `*.cloudsmesh.be`, but not the deeper hostname `api.commit-dev.cloudsmesh.be`. The Google-managed certificate is active when DNS resolves directly to the Google LB IP.
 
-1. Apply base Terraform for VPC, GKE, NAT and the initial network resources.
-2. Deploy Traefik to GKE with `.github/workflows/env-dev--deploy-traefik-reverse-proxy.yaml`.
-3. Apply Terraform resources that depend on the Traefik Kubernetes Service: PSC attachment, PSC endpoint, PSC NEG and External HTTPS LB.
-4. Deploy the application with `.github/workflows/env-dev--deploy-commit-api.yaml`.
-5. Validate the full route from the public DNS name.
+## GitHub Actions
 
-The combined manual GitHub Actions entrypoint is `.github/workflows/env-dev--deploy-all.yaml`.
+Working workflows:
 
-## GitHub Actions Secrets
+- `.github/workflows/env-dev--deploy-commit-api.yaml`
+- `.github/workflows/env-dev--deploy-traefik-ingressroutes.yaml`
 
-The workflows authenticate to GCP through Workload Identity Federation, without static service account keys. The GitHub environment `commit-dev` must contain:
+Additional workflows:
+
+- `.github/workflows/env-dev--deploy-traefik-reverse-proxy.yaml`
+- `.github/workflows/env-dev--installation-sealed-secrets-controller.yaml`
+- `.github/workflows/env-dev--installation-cert-manager.yaml`
+- `.github/workflows/env-dev--deploy-all.yaml`
+
+The GitHub environment `commit-dev` must contain:
 
 - `COMMIT_HW_GCP_PROJECT_ID_B`
 - `COMMIT_HW_GCP_REGION_DEV`
 - `COMMIT_HW_GCP_PROJECT_B_NUMBER`
 - `COMMIT_HW_GCP_SERVICE_ACCOUNT_PROJECT_B`
 
-## Validation Commands
+## Deployment Order
+
+1. Apply base Terraform for VPC, GKE, NAT, and initial networking.
+2. Deploy Sealed Secrets controller.
+3. Deploy Traefik Reverse Proxy.
+4. Apply Terraform resources that depend on the Traefik Service: PSC attachment, PSC endpoint, PSC NEG, External HTTPS LB, and Google-managed SSL.
+5. Configure the Cloudflare DNS record as `DNS only`.
+6. Deploy `commit-api`.
+7. Deploy Traefik IngressRoutes.
+8. Validate the public endpoint.
+
+## Current Kubernetes Routing
+
+`commit-api` is deployed as an HTTPS-only demo backend. It exposes:
+
+- `/healthz` -> `ok`
+- `/` -> JSON status response
+
+The Traefik `IngressRoute` for `api.commit-dev.cloudsmesh.be` lives in the Traefik chart:
+
+```text
+.github/helm-charts/env-dev/traefik-reverse-proxy/traefik/templates/ingressroutes/ingressroute-commit-api.yaml
+```
+
+The application chart does not own the route.
+
+## Source Ranges
+
+The Traefik internal LoadBalancer is restricted to:
+
+```text
+10.10.0.0/16
+10.20.0.0/16
+10.30.0.0/24
+35.191.0.0/16
+130.211.0.0/22
+```
+
+The Google ranges are required for the external Application Load Balancer / GFE path through PSC.
+
+## Validation
 
 ```bash
-kubectl get ingressroutes -A
-kubectl get svc,pods -n commit-api -o wide
-kubectl describe ingressroute commit-api -n commit-api
+dig api.commit-dev.cloudsmesh.be +short
 curl -Iv https://api.commit-dev.cloudsmesh.be/
-curl -fsS https://api.commit-dev.cloudsmesh.be/
+curl https://api.commit-dev.cloudsmesh.be/
+kubectl get pods -n commit-api -o wide
+kubectl get svc -n commit-api
+kubectl get ingressroutes -A
+kubectl get serverstransports -A
 ```
 
-Expected API response:
+Expected DNS:
 
-```json
-{"status":"ok","service":"commit-api","environment":"commit-dev","transport":"https-all-the-way"}
+```text
+136.69.54.142
 ```
 
-## Notes
+Expected curl result:
 
-- The API pod and Traefik backend route use HTTPS inside the cluster.
-- Internal cluster certificates are generated during Helm deployment and are not committed to Git.
-- `cert-manager` remains optional for public certificates because the public edge uses Google-managed SSL through the external load balancer.
+```text
+HTTP/2 200
+server: nginx/1.29.8
+via: 1.1 google
+```
+
+## Sealed Secrets
+
+Sealed Secrets controller is installed in GKE. It is used for the Traefik Dashboard basic-auth secret.
+
+## Next Step
+
+Configure cert-manager and certificate handling for Traefik Reverse Proxy resources.
