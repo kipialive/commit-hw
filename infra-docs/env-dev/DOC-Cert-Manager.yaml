@@ -18,6 +18,10 @@ kubeseal \
 
 rm ./cloudflare-api-token-secret.yaml
 
+# Validation
+rg "name: cloudflare-api-token-secret|namespace: cert-manager" \
+  ~/HW/commit-hw/.github/helm-charts/env-dev/cert-manager/templates/sealedsecret-cloudflare-api-token.yaml
+
 ###### ###### ###### ###### ###### ######
 ### Tests ###
 ###### ###### ###### ###### ###### ######
