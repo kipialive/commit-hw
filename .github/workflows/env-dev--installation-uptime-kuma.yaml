@@ -1,159 +1,264 @@
 ## .github/workflows/env-dev--installation-uptime-kuma.yaml
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ######
-### NOTE ### This GitLab CI job installs Uptime Kuma on the GKE cluster.
+### NOTE ### This GitHub Actions CI/CD pipeline job installs Uptime Kuma on the GKE cluster.
 ### Uptime Kuma monitors HTTP/HTTPS endpoints for all *.dev.cloudsmesh.be services.
 ### Built-in Telegram notifications reuse @jit_access_portal_bot.
-### Web UI: https://uptime.dev.cloudsmesh.be (Forward Auth SSO)
+### Web UI: https://uptime.dev.cloudsmesh.be
 ###### ###### ###### ###### ###### ###### ###### ###### ###### ######
-# ------------------------------
-# Global variables (GitLab CI)
-# ------------------------------
-variables:
-  ENVIRONMENT: "develop"
-  AWS_ACCOUNT_ID: "${KEYPER_AWS_ACCOUNT_ID}"
-  AWS_REGION: "${KEYPER_AWS_REGION}"
-  AWS_ROLE_ARN: "arn:aws:iam::${KEYPER_AWS_ACCOUNT_ID}:role/dcentralab-keyper-GitLabCIRole"
-  GKE_NAME: "k8s-jit-eks-02"
+name: Installation Uptime Kuma to GKE
 
-  UPTIME_KUMA_NAMESPACE: monitoring
-  HELM_FOLDER: "helm-charts/env-jit"
+on:
+  push:
+    branches:
+      # - never-trigger-this-branch
+      - main
+    paths:
+      - ".github/helm-charts/env-dev/uptime-kuma/**"
+      - ".github/workflows/env-dev--installation-uptime-kuma.yaml"
+  workflow_dispatch:
+    inputs:
+      gke_cluster_name:
+        description: 'GKE Cluster Name'
+        required: true
+        type: string
+        default: 'commit-dev-gke-cluster'
 
-  UPTIME_KUMA_RELEASE_NAME: "uptime-kuma"
-  UPTIME_KUMA_CHART_VERSION: "2.24.0"
+  workflow_call:
+    inputs:
+      gke_cluster_name:
+        required: true
+        type: string
 
-# ----------------------------------------------------------
-# Install Uptime Kuma
-# ----------------------------------------------------------
-installation-uptime-kuma:
-  stage: deploy-uptime-kuma
-  rules:
-    - if: $CI_COMMIT_BRANCH == "traefik-reverse-proxy" || $CI_COMMIT_BRANCH == "main"
-      changes:
-        - .github/workflows/env-dev--installation-uptime-kuma.yaml
-        - helm-charts/env-jit/uptime-kuma/**/*
-    - when: never
-  tags: []
-  image: alpine/k8s:1.35.2
-  when: manual
-  allow_failure: false
+permissions:
+  id-token: write
+  contents: read
+  actions: read
 
-  id_tokens:
-    AWS_OIDC_TOKEN:
-      aud: https://gitlab.com
+env:
+  ENVIRONMENT: commit-dev
+  GCP_PROJECT_ID: ${{ secrets.COMMIT_HW_GCP_PROJECT_ID_B }}
+  GCP_REGION: ${{ secrets.COMMIT_HW_GCP_REGION_DEV }}
+  GKE_CLUSTER: ${{ github.event.inputs.gke_cluster_name || inputs.gke_cluster_name || 'commit-dev-gke-cluster' }}
+  GCP_PROJECT_NUMBER: ${{ secrets.COMMIT_HW_GCP_PROJECT_B_NUMBER }}
+  GCP_SERVICE_ACCOUNT: ${{ secrets.COMMIT_HW_GCP_SERVICE_ACCOUNT_PROJECT_B }}
 
-  variables:
-    UPTIME_KUMA_VALUES: "${HELM_FOLDER}/uptime-kuma/values.yaml"
+jobs:
+  installation-uptime-kuma:
+    name: Install Uptime Kuma to GKE
+    runs-on: ubuntu-24.04
+    environment: commit-dev
 
-  before_script:
-    - mkdir -p .aws-out
+    # Declare environment variables for the current job
+    env:
+      UPTIME_KUMA_NAMESPACE: "monitoring"
+      UPTIME_KUMA_RELEASE_NAME: "uptime-kuma"
+      UPTIME_KUMA_CHART: "uptime-kuma/uptime-kuma"
+      UPTIME_KUMA_CHART_REPO_NAME: "uptime-kuma"
+      UPTIME_KUMA_CHART_REPO_URL: "https://helm.irsigler.cloud"
+      UPTIME_KUMA_CHART_VERSION: "2.24.0"
+      UPTIME_KUMA_CHART_CACHE_DIR: "/tmp/uptime-kuma-chart"
+      UPTIME_KUMA_CHART_DIR: "/tmp/uptime-kuma-chart/uptime-kuma"
+      UPTIME_KUMA_VALUES: ".github/helm-charts/env-dev/uptime-kuma/values.yaml"
+      UPTIME_KUMA_HOST: "uptime.dev.cloudsmesh.be"
+      UPTIME_KUMA_SERVICE_PORT: "3001"
+      TRAEFIK_NAMESPACE: "traefik-reverse-proxy"
+      TRAEFIK_TLS_SECRET: "dev-cloudsmesh-be-prod-tls"
+      ERROR_LOG_FILE: "err.log"
+      WAIT_TIMEOUT: "5m"
+      KUBECTL_TIMEOUT: "120s"
 
-    - |
-      echo "$AWS_OIDC_TOKEN" > /tmp/gitlab_oidc_token
+    steps:
+      # Step 1: Print who triggered this build (whoami)
+      - name: Who triggered this build?
+        run: |
+          echo "Triggered by: ${{ github.actor }}"
 
-      export AWS_ROLE_ARN="$AWS_ROLE_ARN"
-      export AWS_WEB_IDENTITY_TOKEN_FILE="/tmp/gitlab_oidc_token"
-      export AWS_REGION="$AWS_REGION"
+      # Step 2: Print the caller repo name
+      - name: Print caller repo "CommIT-HW" name
+        run: |
+          echo "CommIT-HW Caller Repo Name is: ${{ github.repository }}"
 
-      aws sts get-caller-identity
+      # Step 3: Checkout the repository code (This ensures the GitHub Actions runner has access to your repo)
+      - name: Checkout Repository
+        uses: actions/checkout@v5
 
-  script:
-    # Step 1: Print who triggered this build
-    - |
-      echo "Triggered by: ${GITLAB_USER_LOGIN}"
+      # Step 4: Authenticate to Google Cloud via OIDC provider without static service account keys
+      - name: Authenticate to Google Cloud via OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          # GitHub Actions → GCP Workload Identity Federation exchange
+          workload_identity_provider: "projects/${{ env.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "${{ env.GCP_SERVICE_ACCOUNT }}"
 
-    # Step 2: Print the caller repo name
-    - |
-      echo "DcentraLab Caller Repo Name is: ${CI_PROJECT_PATH}"
+      # Step 5: Fetch GKE cluster access credentials and automatically configure local kubeconfig
+      - name: Set up Cloud SDK and Configure GKE kubeconfig
+        uses: google-github-actions/get-gke-credentials@v3
+        with:
+          cluster_name: "${{ env.GKE_CLUSTER }}"
+          location: "${{ env.GCP_REGION }}"
+          project_id: "${{ env.GCP_PROJECT_ID }}"
 
-    # Step 3: Verify git checkout
-    - |
-      git rev-parse --is-inside-work-tree
-      git status --porcelain || true
+      # Step 6: Perform a smoke test to ensure direct connectivity to the private GKE control plane
+      - name: Verify cluster connectivity
+        run: |
+          set -euo pipefail
+          echo "Checking connection to GKE..."
+          kubectl get nodes || { echo "❌ ERROR: Cannot connect to GKE cluster"; exit 1; }
 
-    # Step 4: Setup kubeconfig
-    - |
-      set -euo pipefail
-      aws eks update-kubeconfig \
-        --region "${AWS_REGION}" \
-        --name "${GKE_NAME}"
-      kubectl get nodes || { echo "❌ ERROR: Cannot connect to GKE cluster"; exit 1; }
+      # Step 7: Ensure Uptime Kuma namespace exists
+      - name: Ensure Uptime Kuma Namespace Exists
+        run: |
+          set -euo pipefail
+          kubectl create namespace "${UPTIME_KUMA_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
-    # Step 5: Ensure monitoring namespace exists
-    - |
-      set -euo pipefail
-      if kubectl get namespace "${UPTIME_KUMA_NAMESPACE}" >/dev/null 2>&1; then
-        echo "Namespace ${UPTIME_KUMA_NAMESPACE} already exists."
-      else
-        echo "Creating namespace ${UPTIME_KUMA_NAMESPACE}..."
-        kubectl create namespace "${UPTIME_KUMA_NAMESPACE}"
-        echo "✅ Namespace ${UPTIME_KUMA_NAMESPACE} created."
-      fi
+      # Step 8: Verify Traefik and TLS prerequisites for the private Web UI route
+      - name: Verify Traefik Route Prerequisites
+        run: |
+          set -euo pipefail
 
-    # Step 6: Add Uptime Kuma Helm repo
-    - |
-      set -euo pipefail
-      helm repo add uptime-kuma https://helm.irsigler.cloud
-      helm repo update uptime-kuma
-      echo "✅ Uptime Kuma Helm repo added."
+          if ! kubectl get crd ingressroutes.traefik.io >/dev/null 2>&1; then
+            echo "❌ ERROR: Traefik IngressRoute CRD is missing. Deploy Traefik first."
+            exit 1
+          fi
 
-    # Step 7: Install Uptime Kuma
-    - |
-      set -euo pipefail
-      echo "Installing Uptime Kuma..."
+          if ! kubectl get secret "${TRAEFIK_TLS_SECRET}" -n "${TRAEFIK_NAMESPACE}" >/dev/null 2>&1; then
+            echo "❌ ERROR: Missing ${TRAEFIK_NAMESPACE}/${TRAEFIK_TLS_SECRET}."
+            echo "Deploy cert-manager resources before exposing Uptime Kuma through Traefik."
+            exit 1
+          fi
 
-      if ! helm upgrade --install "${UPTIME_KUMA_RELEASE_NAME}" uptime-kuma/uptime-kuma \
-              --namespace "${UPTIME_KUMA_NAMESPACE}" \
-              --values "${UPTIME_KUMA_VALUES}" \
-              --version "${UPTIME_KUMA_CHART_VERSION}" \
-              --wait --timeout=5m 2>err.log; then
-        echo "❌ ERROR: Failed to install Uptime Kuma:"
-        cat err.log
-        exit 1
-      else
-        echo "✅ Uptime Kuma installed."
-      fi
+          echo "✅ Traefik CRD and TLS secret are ready."
 
-    # Step 8: Wait for Deployment to be ready
-    - |
-      set -euo pipefail
-      echo "Waiting for Uptime Kuma..."
+      # Step 9: Verify configured StorageClass exists before Helm creates the PVC
+      - name: Verify Uptime Kuma StorageClass
+        run: |
+          set -euo pipefail
+          STORAGE_CLASS=$(awk '/^[[:space:]]*storageClassName:/ {print $2; exit}' "${UPTIME_KUMA_VALUES}" | tr -d '"')
 
-      DEPLOY_NAME=$(kubectl get deploy -n "${UPTIME_KUMA_NAMESPACE}" -l app.kubernetes.io/name=uptime-kuma -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "uptime-kuma")
-      echo "Deployment name: ${DEPLOY_NAME}"
+          if [ -z "${STORAGE_CLASS}" ] || [ "${STORAGE_CLASS}" = "null" ]; then
+            echo "No explicit storageClassName configured. The cluster default StorageClass will be used."
+            exit 0
+          fi
 
-      kubectl rollout status deployment/"${DEPLOY_NAME}" -n "${UPTIME_KUMA_NAMESPACE}" --timeout=120s || {
-        echo "⚠️ Uptime Kuma rollout timed out."
-        kubectl get pods -n "${UPTIME_KUMA_NAMESPACE}" -l app.kubernetes.io/name=uptime-kuma -o wide
-        exit 1
-      }
-      echo "✅ Uptime Kuma is ready."
+          echo "Checking StorageClass ${STORAGE_CLASS}..."
+          kubectl get storageclass "${STORAGE_CLASS}" >/dev/null
+          echo "✅ StorageClass ${STORAGE_CLASS} exists."
 
-    # Step 9: Show deployed resources summary
-    - |
-      set -euo pipefail
+      # Step 10: Add and update the Uptime Kuma Helm repository
+      - name: Add Uptime Kuma Helm Repository
+        run: |
+          set -euo pipefail
+          helm repo add "${UPTIME_KUMA_CHART_REPO_NAME}" "${UPTIME_KUMA_CHART_REPO_URL}"
+          helm repo update "${UPTIME_KUMA_CHART_REPO_NAME}"
+          helm search repo "${UPTIME_KUMA_CHART}" --versions | head -10
 
-      echo "=== Uptime Kuma Pods ==="
-      kubectl get pods -n "${UPTIME_KUMA_NAMESPACE}" -l app.kubernetes.io/name=uptime-kuma -o wide
+      # Step 11: Pull the pinned Uptime Kuma Helm chart version locally
+      - name: Pull Uptime Kuma Helm Chart
+        run: |
+          set -euo pipefail
+          mkdir -p "${UPTIME_KUMA_CHART_CACHE_DIR}"
+          helm pull "${UPTIME_KUMA_CHART}" \
+            --version "${UPTIME_KUMA_CHART_VERSION}" \
+            --untar \
+            --untardir "${UPTIME_KUMA_CHART_CACHE_DIR}"
 
-      echo "=== Services ==="
-      kubectl get svc -n "${UPTIME_KUMA_NAMESPACE}" -l app.kubernetes.io/name=uptime-kuma
+      # Step 12: Validate Uptime Kuma chart values via Helm Lint validation rules
+      - name: Helm Chart Lint Validation
+        run: |
+          set -euo pipefail
+          echo "Linting Helm chart ${UPTIME_KUMA_CHART_DIR} with values ${UPTIME_KUMA_VALUES}"
+          helm lint "${UPTIME_KUMA_CHART_DIR}" \
+            -f "${UPTIME_KUMA_VALUES}"
 
-      echo "=== PVCs ==="
-      kubectl get pvc -n "${UPTIME_KUMA_NAMESPACE}" -l app.kubernetes.io/name=uptime-kuma
+      # Step 13: Execute Helm dry-run rendering execution test
+      - name: Helm Template Dry-Run Test
+        run: |
+          set -euo pipefail
+          echo "Testing dry-run template rendering for ${UPTIME_KUMA_CHART_DIR}"
+          helm template "${UPTIME_KUMA_RELEASE_NAME}" "${UPTIME_KUMA_CHART_DIR}" \
+            --namespace "${UPTIME_KUMA_NAMESPACE}" \
+            -f "${UPTIME_KUMA_VALUES}"
 
-      echo "=== Helm Release ==="
-      helm list -n "${UPTIME_KUMA_NAMESPACE}" | grep uptime-kuma
+      # Step 14: Deploy Uptime Kuma with Helm
+      - name: Deploy Uptime Kuma via Helm
+        run: |
+          set -euo pipefail
+          echo "Deploying Uptime Kuma release ${UPTIME_KUMA_RELEASE_NAME} into namespace ${UPTIME_KUMA_NAMESPACE}..."
 
-      echo ""
-      echo "📋 SUMMARY:"
-      echo "   Release:     ${UPTIME_KUMA_RELEASE_NAME} in ${UPTIME_KUMA_NAMESPACE}"
-      echo "   Type:        Deployment (1 replica)"
-      echo "   Port:        3001 (service type: ClusterIP)"
-      echo "   Storage:     1Gi gp3 PVC"
-      echo "   Web UI:      https://uptime.dev.cloudsmesh.be (requires IngressRoute + DNS)"
-      echo ""
-      echo "📋 POST-DEPLOY STEPS:"
-      echo "   1. Create DNS record: uptime.dev.cloudsmesh.be → NLB (same alias)"
-      echo "   2. Deploy IngressRoute: run env-jit--deploy-traefik-ingressroutes.yaml pipeline"
-      echo "   3. Open Web UI → set admin password → configure Telegram notification"
-      echo "   4. Add monitors for all *.dev.cloudsmesh.be endpoints"
+          if ! helm upgrade --install "${UPTIME_KUMA_RELEASE_NAME}" "${UPTIME_KUMA_CHART_DIR}" \
+                  --namespace "${UPTIME_KUMA_NAMESPACE}" \
+                  --create-namespace \
+                  -f "${UPTIME_KUMA_VALUES}" \
+                  --atomic --wait --timeout="${WAIT_TIMEOUT}" 2>"${ERROR_LOG_FILE}"; then
+            if grep -q "Forbidden" "${ERROR_LOG_FILE}"; then
+              echo "❌ ERROR: Cannot deploy Uptime Kuma via Helm. Missing RBAC permission!"
+              cat "${ERROR_LOG_FILE}"
+              exit 1
+            else
+              echo "❌ ERROR: Failed to deploy Uptime Kuma via Helm due to an unknown error:"
+              cat "${ERROR_LOG_FILE}"
+              exit 1
+            fi
+          else
+            echo "✅ Uptime Kuma successfully deployed."
+          fi
+
+      # Step 15: Wait for the Uptime Kuma Deployment rollout
+      - name: Verify Uptime Kuma Rollout
+        run: |
+          set -euo pipefail
+          DEPLOYMENT_NAME=$(kubectl get deploy -n "${UPTIME_KUMA_NAMESPACE}" \
+            -l app.kubernetes.io/name=uptime-kuma \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+          if [ -z "${DEPLOYMENT_NAME}" ]; then
+            DEPLOYMENT_NAME="${UPTIME_KUMA_RELEASE_NAME}"
+          fi
+
+          echo "Waiting for Deployment ${DEPLOYMENT_NAME}..."
+          kubectl rollout status deployment/"${DEPLOYMENT_NAME}" \
+            -n "${UPTIME_KUMA_NAMESPACE}" \
+            --timeout="${KUBECTL_TIMEOUT}"
+
+      # Step 16: Run a smoke test against the ClusterIP Service from inside GKE
+      - name: Smoke Test Uptime Kuma Service
+        run: |
+          set -euo pipefail
+          kubectl run uptime-kuma-curl-${GITHUB_RUN_ID} \
+            --namespace "${UPTIME_KUMA_NAMESPACE}" \
+            --rm -i --restart=Never \
+            --image=curlimages/curl:8.11.1 \
+            --command -- curl -fsS \
+              "http://${UPTIME_KUMA_RELEASE_NAME}.${UPTIME_KUMA_NAMESPACE}.svc.cluster.local:${UPTIME_KUMA_SERVICE_PORT}/" \
+              >/dev/null
+
+      # Step 17: Show end-of-pipeline operational status output report overview
+      - name: Show Final Operational Pipeline Summary Report
+        run: |
+          set -euo pipefail
+          echo "=== Uptime Kuma Pods ==="
+          kubectl get pods -n "${UPTIME_KUMA_NAMESPACE}" -l app.kubernetes.io/name=uptime-kuma -o wide
+
+          echo "=== Uptime Kuma Services ==="
+          kubectl get svc -n "${UPTIME_KUMA_NAMESPACE}" -l app.kubernetes.io/name=uptime-kuma -o wide
+
+          echo "=== Uptime Kuma PVCs ==="
+          kubectl get pvc -n "${UPTIME_KUMA_NAMESPACE}" -l app.kubernetes.io/name=uptime-kuma -o wide || true
+
+          echo "=== Uptime Kuma Helm Release ==="
+          helm list -n "${UPTIME_KUMA_NAMESPACE}" | grep "${UPTIME_KUMA_RELEASE_NAME}"
+
+          echo "=== Uptime Kuma Traefik IngressRoute ==="
+          kubectl get ingressroute uptime-kuma -n "${TRAEFIK_NAMESPACE}" -o wide || true
+
+          echo ""
+          echo "Summary:"
+          echo "  Release: ${UPTIME_KUMA_RELEASE_NAME}"
+          echo "  Namespace: ${UPTIME_KUMA_NAMESPACE}"
+          echo "  Service port: ${UPTIME_KUMA_SERVICE_PORT}"
+          echo "  Web UI: https://${UPTIME_KUMA_HOST}"
+          echo ""
+          echo "Post-deploy:"
+          echo "  1. Deploy or refresh Traefik IngressRoutes if uptime-kuma route is missing."
+          echo "  2. Open https://${UPTIME_KUMA_HOST} through Twingate."
+          echo "  3. Create the initial admin user and configure monitors/notifications in the UI."

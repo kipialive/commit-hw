@@ -55,7 +55,7 @@
 # 2. Update values.yaml image.tag if needed (default: "1" = latest stable)
 #
 # 3. Re-run pipeline:
-#    GitLab → CI/CD → Pipelines → env-jit--installation-uptime-kuma.yaml → Run
+#    GitHub Actions → env-dev--installation-uptime-kuma.yaml → Run workflow
 #
 # 4. Verify: monitors still active + data retained (PVC persists across upgrades)
 
@@ -89,11 +89,6 @@
 #   - Retries: 3
 #   - Retry Interval: 30 seconds
 #   - Timeout: 10 seconds
-#
-# ⚠️ NOTE: Some endpoints are protected by Authentik Forward Auth (SSO).
-#   Unauthenticated requests get HTTP 302 redirect to Authentik login.
-#   For these monitors: set Accepted Status Codes to "200-399".
-#   For endpoints with health APIs: use the health URL with "200-299".
 
 ##### ##### ##### ##### #####
 ### Group 1: Health Check Endpoints (most reliable — bypass SSO) ###
@@ -105,12 +100,12 @@
 # ┌────┬───────────────────────────────────────────────────────────────┬──────────────────────────────┬───────────┐
 # │ #  │ URL                                                           │ Name                         │ Expected  │
 # ├────┼───────────────────────────────────────────────────────────────┼──────────────────────────────┼───────────┤
-# │  1 │ https://grafana.dev.cloudsmesh.be/api/health          │ Grafana (Health API)         │ 200 JSON  │
-# │  2 │ https://infisical.dev.cloudsmesh.be/api/status        │ Infisical (Health API)       │ 200 JSON  │
-# │  3 │ https://n8n.dev.cloudsmesh.be/healthz                 │ n8n (Health)                 │ 200       │
-# │  4 │ https://n8n.dev.cloudsmesh.be/form/jit-access         │ JIT Portal (Public Form)     │ 200 HTML  │
-# │  5 │ https://authentik.dev.cloudsmesh.be/-/health/ready/   │ Authentik (Health API)       │ 200       │
-# │  6 │ https://teleport.dev.cloudsmesh.be/webapi/ping        │ Teleport (Ping API)          │ 200 JSON  │
+# │  1 │ https://grafana.dev.cloudsmesh.be/api/health                  │ Grafana (Health API)         │ 200 JSON  │
+# │  2 │ https://infisical.dev.cloudsmesh.be/api/status                │ Infisical (Health API)       │ 200 JSON  │
+# │  3 │ https://n8n.dev.cloudsmesh.be/healthz                         │ n8n (Health)                 │ 200       │
+# │  4 │ https://n8n.dev.cloudsmesh.be/form/jit-access                 │ JIT Portal (Public Form)     │ 200 HTML  │
+# │  5 │ https://authentik.dev.cloudsmesh.be/-/health/ready/           │ Authentik (Health API)       │ 200       │
+# │  6 │ https://teleport.dev.cloudsmesh.be/webapi/ping                │ Teleport (Ping API)          │ 200 JSON  │
 # └────┴───────────────────────────────────────────────────────────────┴──────────────────────────────┴───────────┘
 
 ##### ##### ##### ##### #####
@@ -124,14 +119,14 @@
 # ┌────┬───────────────────────────────────────────────────────────────┬──────────────────────────────┬───────────┐
 # │ #  │ URL                                                           │ Name                         │ Expected  │
 # ├────┼───────────────────────────────────────────────────────────────┼──────────────────────────────┼───────────┤
-# │  7 │ https://alertmanager.dev.cloudsmesh.be                │ Alertmanager (SSO)           │ 302       │
-# │  8 │ https://coroot.dev.cloudsmesh.be                      │ Coroot (SSO)                 │ 302       │
-# │  9 │ https://mailpit.dev.cloudsmesh.be                     │ Mailpit (SSO)                │ 302       │
-# │ 10 │ https://goldilocks.dev.cloudsmesh.be                  │ Goldilocks (SSO)             │ 302       │
-# │ 11 │ https://victoriametrics.dev.cloudsmesh.be             │ VictoriaMetrics VMUI (SSO)   │ 302       │
-# │ 12 │ https://victorialogs.dev.cloudsmesh.be                │ VictoriaLogs VMUI (SSO)      │ 302       │
-# │ 13 │ https://opencost.dev.cloudsmesh.be                    │ OpenCost (SSO)               │ 302       │
-# │ 14 │ https://uptime.dev.cloudsmesh.be                      │ Uptime Kuma (SSO, self-mon)  │ 302       │
+# │  7 │ https://alertmanager.dev.cloudsmesh.be                        │ Alertmanager (SSO)           │ 302       │
+# │  8 │ https://uptime.dev.cloudsmesh.be                              │ Uptime Kuma (Private UI)     │ 200/401   │
+# │  9 │ https://mailpit.dev.cloudsmesh.be                             │ Mailpit (SSO)                │ 302       │
+# │ 10 │ https://goldilocks.dev.cloudsmesh.be                          │ Goldilocks (SSO)             │ 302       │
+# │ 11 │ https://victoriametrics.dev.cloudsmesh.be                     │ VictoriaMetrics VMUI (SSO)   │ 302       │
+# │ 12 │ https://victorialogs.dev.cloudsmesh.be                        │ VictoriaLogs VMUI (SSO)      │ 302       │
+# │ 13 │ https://opencost.dev.cloudsmesh.be                            │ OpenCost (SSO)               │ 302       │
+# │ 14 │ https://uptime.dev.cloudsmesh.be                              │ Uptime Kuma (SSO, self-mon)  │ 302       │
 # └────┴───────────────────────────────────────────────────────────────┴──────────────────────────────┴───────────┘
 #
 # NOTE on self-monitoring (#14): Uptime Kuma monitoring itself is useful —
@@ -219,7 +214,7 @@
 #   kubectl get pvc -n monitoring -l app.kubernetes.io/name=uptime-kuma
 # Expected:
 #   NAME          STATUS   VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-#   uptime-kuma   Bound    pvc-xxx   4Gi        RWO            gp3            Xm
+#   uptime-kuma   Bound    pvc-xxx   1Gi        RWO            standard-rwo   Xm
 
 # ─── Test 4: Web UI reachable via port-forward ───
 # Command:
@@ -258,7 +253,7 @@
 ##### ##### ##### ##### ##### ##### ##### #####
 
 # Problem: Pod stuck in Pending
-# Cause: PVC not provisioning (gp3 StorageClass missing or EBS CSI driver not installed)
+# Cause: PVC not provisioning (StorageClass missing or GKE Persistent Disk CSI issue)
 # Fix: kubectl describe pvc -n monitoring uptime-kuma → check events
 
 # Problem: Web UI shows 404 or 503

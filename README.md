@@ -176,7 +176,7 @@ Access only via Twingate VPN
 
 ```text
 traefik-dashboard.dev.cloudsmesh.be
-coroot.dev.cloudsmesh.be
+uptime.dev.cloudsmesh.be
   -> Twingate VPN
   -> Twingate connector pod in GKE
   -> Traefik Kubernetes Service ClusterIP
@@ -248,4 +248,4 @@ www-authenticate: Basic realm="traefik"
 
 ## Next Step
 
-Add the next private platform application route, for example `coroot.dev.cloudsmesh.be`, using the same `dev-cloudsmesh-be-prod-tls` certificate.
+Deploy Uptime Kuma at `uptime.dev.cloudsmesh.be` and use the same `dev-cloudsmesh-be-prod-tls` certificate for the Traefik route.
