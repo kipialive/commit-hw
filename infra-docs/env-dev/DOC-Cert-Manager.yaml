@@ -1,0 +1,34 @@
+###### ###### ###### ###### ###### ######
+### **Create Sealed-Secret** ###
+###### ###### ###### ###### ###### ######
+
+cd ~/HW/commit-hw/.github/helm-charts/env-dev/cert-manager/templates/
+
+kubectl create secret generic cloudflare-api-token-secret \
+  --namespace cert-manager \
+  --from-literal=api-token='<PASTE_CLOUDFLARE_API_TOKEN_HERE>' \
+  --dry-run=client \
+  -o yaml > cloudflare-api-token-secret.yaml
+
+kubeseal \
+  --format yaml \
+  --cert ~/HW/commit-hw/.github/helm-charts/env-dev/traefik-reverse-proxy/scripts/public.pem \
+  < cloudflare-api-token-secret.yaml \
+  > ./sealedsecret-cloudflare-api-token.yaml
+
+rm ./cloudflare-api-token-secret.yaml
+
+###### ###### ###### ###### ###### ######
+### Tests ###
+###### ###### ###### ###### ###### ######
+
+# After you run GitHub Actions CI/CD pipeline
+kubectl get clusterissuer
+kubectl get certificate -A
+kubectl get secret dev-cloudsmesh-be-staging-tls -n traefik-reverse-proxy
+kubectl get secret dev-cloudsmesh-be-prod-tls -n traefik-reverse-proxy
+
+# If Certificat is not Ready
+kubectl describe certificate dev-cloudsmesh-be-prod-tls -n traefik-reverse-proxy
+kubectl get challenges -A
+kubectl describe challenge -n traefik-reverse-proxy
