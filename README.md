@@ -56,11 +56,11 @@ Private platform records after Twingate/private access is ready:
 ```text
 Type: A
 Name: *.dev
-Target: 10.20.0.7
+Target: 172.17.10.17
 Proxy status: DNS only
 ```
 
-`*.dev.cloudsmesh.be` points to the private Traefik Internal LoadBalancer VIP and is intended for access through Twingate, not directly from the public Internet.
+`*.dev.cloudsmesh.be` points to the Traefik Kubernetes Service `ClusterIP` because the Twingate connector runs inside GKE. This private address is intended for access through Twingate, not directly from the public Internet.
 
 Do not use Cloudflare `Proxied` for `api.commit-dev.cloudsmesh.be` on the free plan. Cloudflare Universal SSL covers `*.cloudsmesh.be`, but not the deeper hostname `api.commit-dev.cloudsmesh.be`. The Google-managed certificate is active when DNS resolves directly to the Google LB IP.
 
@@ -171,15 +171,15 @@ api.commit-dev.cloudsmesh.be
 ```
 
 Private (Internal) platform apps:
-*.dev.cloudsmesh.be -> 10.20.0.7
+*.dev.cloudsmesh.be -> 172.17.10.17
 Access only via Twingate VPN
 
 ```text
 traefik-dashboard.dev.cloudsmesh.be
 coroot.dev.cloudsmesh.be
   -> Twingate VPN
-  -> private GCP/GKE network
-  -> internal Traefik LoadBalancer
+  -> Twingate connector pod in GKE
+  -> Traefik Kubernetes Service ClusterIP
   -> Traefik IngressRoute
   -> service
 ```
@@ -216,6 +216,36 @@ Traefik private `IngressRoute` resources reference the production secret through
 
 The public API stays on the Google-managed certificate attached to the external Google HTTPS Load Balancer.
 
+## Twingate
+
+The Twingate connector is installed in GKE through Helm. The working private access path is:
+
+```text
+Mac Twingate client
+-> Twingate relay/control plane
+-> Twingate connector pod in GKE
+-> traefik-reverse-proxy Service ClusterIP 172.17.10.17
+-> Traefik websecure
+-> private app IngressRoute
+```
+
+Validation:
+
+```bash
+dig traefik-dashboard.dev.cloudsmesh.be +short
+curl -Iv https://traefik-dashboard.dev.cloudsmesh.be/dashboard/
+```
+
+Expected result:
+
+```text
+SSL certificate verify ok
+HTTP/2 401
+www-authenticate: Basic realm="traefik"
+```
+
+`401` is expected because the Traefik Dashboard route is protected by basic-auth.
+
 ## Next Step
 
-Create the Cloudflare DNS-01 token secret, deploy cert-manager resources, and later install Twingate for private access to `*.dev.cloudsmesh.be`.
+Add the next private platform application route, for example `coroot.dev.cloudsmesh.be`, using the same `dev-cloudsmesh-be-prod-tls` certificate.

@@ -68,23 +68,28 @@ kubectl -n traefik-reverse-proxy logs deploy/traefik-reverse-proxy
 # api.commit-dev.cloudsmesh.be | A | 136.69.54.142 | DNS only
 #
 # Private platform apps:
-# *.dev.cloudsmesh.be | A | 10.20.0.7 | DNS only
+# *.dev.cloudsmesh.be | A | 172.17.10.17 | DNS only
 #
-# Access to 10.20.0.7 is expected to go through Twingate/private network access.
+# The Twingate connector runs inside GKE, so it reaches Traefik through the
+# Kubernetes Service ClusterIP instead of the GCP Internal LoadBalancer VIP.
+# Access to 172.17.10.17 is expected to go through Twingate/private network access.
 
 ###### ###### ###### ###### ###### ######
-### Tests ###
+### Tests via Twingate VPN ###
 ###### ###### ###### ###### ###### ######
 
 dig traefik-dashboard.dev.cloudsmesh.be +short
 curl -I -v https://traefik-dashboard.dev.cloudsmesh.be/dashboard/
 curl -kv https://traefik-dashboard.dev.cloudsmesh.be/dashboard/ 2>&1 | grep -E "subject:|issuer:|expire|CN="
 
+# Expected:
+# dig -> Twingate client address from the 100.64.0.0/10 range
+# curl -> HTTP/2 401 with Basic realm="traefik"
+
 
 dig coroot.dev.cloudsmesh.be +short
 curl -I -v https://coroot.dev.cloudsmesh.be/
 curl -kv https://coroot.dev.cloudsmesh.be/ 2>&1 | grep -E "subject:|issuer:|expire|CN="
-
 
 
 
