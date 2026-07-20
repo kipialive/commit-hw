@@ -169,25 +169,14 @@ jobs:
           set -euo pipefail
           kubectl create namespace "${TRAEFIK_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
-      # Step 12: Verify Cloudflare API token Secret exists for DNS-01
-      - name: Verify Cloudflare DNS-01 Token Secret
-        run: |
-          set -euo pipefail
-          if ! kubectl get secret "${CLOUDFLARE_TOKEN_SECRET_NAME}" -n "${CERT_MANAGER_NAMESPACE}" >/dev/null 2>&1; then
-            echo "❌ ERROR: Missing ${CERT_MANAGER_NAMESPACE}/${CLOUDFLARE_TOKEN_SECRET_NAME}."
-            echo "Create it with key 'api-token' before deploying cert-manager resources."
-            exit 1
-          fi
-          echo "✅ Cloudflare API token Secret exists."
-
-      # Step 13: Validate local wrapper chart via Helm Lint validation rules
+      # Step 12: Validate local wrapper chart via Helm Lint validation rules
       - name: Helm Chart Lint Validation
         run: |
           set -euo pipefail
           echo "Linting Helm chart directory: ${CHART_DIR}"
           helm lint "${CHART_DIR}" -f "${CHART_VALUES}"
 
-      # Step 14: Execute Helm dry-run rendering execution test
+      # Step 13: Execute Helm dry-run rendering execution test
       - name: Helm Template Dry-Run Test
         run: |
           set -euo pipefail
@@ -196,7 +185,7 @@ jobs:
             -n "${CERT_MANAGER_NAMESPACE}" \
             -f "${CHART_VALUES}"
 
-      # Step 15: Deploy custom local wrapper application chart containing ClusterIssuer and Certificates
+      # Step 14: Deploy custom local wrapper application chart containing SealedSecret, ClusterIssuers, and Certificates
       - name: Deploy Custom Cert-Manager Wrapper Chart Resources
         run: |
           set -euo pipefail
@@ -218,6 +207,26 @@ jobs:
           else
             echo "✅ Custom cert-manager resources (ClusterIssuer + Certificate) applied."
           fi
+
+      # Step 15: Wait until Sealed Secrets controller creates the Cloudflare DNS-01 token Secret
+      - name: Wait for Cloudflare DNS-01 Token Secret
+        run: |
+          set -euo pipefail
+          echo "Waiting for ${CERT_MANAGER_NAMESPACE}/${CLOUDFLARE_TOKEN_SECRET_NAME}..."
+
+          for i in $(seq 1 24); do
+            if kubectl get secret "${CLOUDFLARE_TOKEN_SECRET_NAME}" -n "${CERT_MANAGER_NAMESPACE}" >/dev/null 2>&1; then
+              echo "✅ Cloudflare API token Secret exists."
+              exit 0
+            fi
+            echo "  Attempt ${i}/24: Secret is not ready yet."
+            sleep 5
+          done
+
+          echo "❌ ERROR: Missing ${CERT_MANAGER_NAMESPACE}/${CLOUDFLARE_TOKEN_SECRET_NAME}."
+          echo "Check the SealedSecret template and the sealed-secrets controller status."
+          kubectl get sealedsecret "${CLOUDFLARE_TOKEN_SECRET_NAME}" -n "${CERT_MANAGER_NAMESPACE}" -o yaml || true
+          exit 1
 
       
       # # ==============================================================================
