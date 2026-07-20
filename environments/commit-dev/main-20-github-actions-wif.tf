@@ -5,26 +5,41 @@
 ################################################################################
 
 /*
+
+Based on source:: https://github.com/terraform-google-modules/terraform-google-github-actions-runners
+# example # https://github.com/terraform-google-modules/terraform-google-github-actions-runners/tree/main/examples
+
 # Workload Identity Federation configuration for GitHub Actions
 # Data flow: GitHub Actions → OIDC Token → GCP WIF → IAM Role
 # Done in Project "B"
 */
 
-resource "google_iam_workload_identity_pool" "github_pool" {
-  provider                  = google
-  project                   = var.gcp_project_b_id
-  workload_identity_pool_id = "github-actions-pool"
-  display_name              = "GitHub Actions Pool"
-  description               = "Identity pool for GitHub Actions automation pipelines"
+locals {
+  github_actions_owner                 = "kipialive"
+  github_actions_repository            = "kipialive/commit-hw"
+  github_actions_deployer_sa_name      = "tf-gke-commit-dev-gke--tvos"
+  github_actions_deployer_sa_resource  = "projects/${var.gcp_project_b_id}/serviceAccounts/${local.github_actions_deployer_sa_name}@${var.gcp_project_b_id}.iam.gserviceaccount.com"
+  github_actions_deployer_sa_principal = "attribute.repository/${local.github_actions_repository}"
 }
 
-resource "google_iam_workload_identity_pool_provider" "github_provider" {
-  provider                           = google
-  project                            = var.gcp_project_b_id
-  workload_identity_pool_id          = google_iam_workload_identity_pool.github_pool.workload_identity_pool_id
-  workload_identity_pool_provider_id = "github-provider"
-  display_name                       = "GitHub Provider"
-  description                        = "OIDC identity provider for GitHub Actions workflows"
+module "github_actions_oidc" {
+  source  = "terraform-google-modules/github-actions-runners/google//modules/gh-oidc"
+  version = "5.1.0"
+
+  providers = {
+    google      = google.project_b
+    google-beta = google-beta.project_b
+  }
+
+  project_id  = var.gcp_project_b_id
+  pool_id     = "github-actions-pool"
+  provider_id = "github-provider"
+
+  pool_display_name     = "GitHub Actions Pool"
+  pool_description      = "Identity pool for GitHub Actions automation pipelines"
+  provider_display_name = "GitHub Provider"
+  provider_description  = "OIDC identity provider for GitHub Actions workflows"
+  attribute_condition   = "assertion.repository_owner == '${local.github_actions_owner}'"
 
   attribute_mapping = {
     "google.subject"       = "assertion.sub"
@@ -33,25 +48,12 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
     "attribute.owner"      = "assertion.repository_owner"
   }
 
-  # This explicit condition ensures only your GitHub organization/user can attempt authentication
-  attribute_condition = "assertion.repository_owner == 'kipialive'"
-
-  oidc {
-    issuer_uri = "https://token.actions.githubusercontent.com"
+  sa_mapping = {
+    (local.github_actions_deployer_sa_name) = {
+      sa_name   = local.github_actions_deployer_sa_resource
+      attribute = local.github_actions_deployer_sa_principal
+    }
   }
-}
-
-# ---------------------------------------------------------------
-# IAM Binding to allow GitHub Actions to assume the Service Account
-# Access path: WIF Provider → IAM Policy → GKE Deployment Service Account
-# ---------------------------------------------------------------
-
-resource "google_service_account_iam_member" "wif_sa_binding" {
-  service_account_id = "projects/${var.gcp_project_b_id}/serviceAccounts/tf-gke-commit-dev-gke--tvos@${var.gcp_project_b_id}.iam.gserviceaccount.com"
-  role               = "roles/iam.workloadIdentityUser"
-
-  # Only allows pushes from your specific GitHub repository to assume this role
-  member = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/kipialive/commit-hw"
 }
 
 # ---------------------------------------------------------------
@@ -62,5 +64,5 @@ resource "google_service_account_iam_member" "wif_sa_binding" {
 resource "google_project_iam_member" "sa_gke_admin" {
   project = var.gcp_project_b_id
   role    = "roles/container.admin"
-  member  = "serviceAccount:tf-gke-commit-dev-gke--tvos@${var.gcp_project_b_id}.iam.gserviceaccount.com"
+  member  = "serviceAccount:${local.github_actions_deployer_sa_name}@${var.gcp_project_b_id}.iam.gserviceaccount.com"
 }

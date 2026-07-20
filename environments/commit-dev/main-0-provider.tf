@@ -37,6 +37,39 @@ provider "google" {
   }
 }
 
+# The GitHub Actions OIDC module uses google-beta resources internally, so keep
+# beta providers aligned with the same Project A / Project B split.
+provider "google-beta" {
+  project = var.gcp_project_a_id
+  region  = var.gcp_region
+  zone    = var.gcp_zone
+
+  # Global labels automatically applied to all resources in Project A
+  default_labels = {
+    delivery_type = "terraform"
+    environment   = "commit-dev"
+    git_repo      = "commit-hw"
+    owner         = "devops"
+    project       = "commit-hw-project-a"
+  }
+}
+
+provider "google-beta" {
+  alias   = "project_b"
+  project = var.gcp_project_b_id
+  region  = var.gcp_region
+  zone    = var.gcp_zone
+
+  # Global labels automatically applied to all resources in Project B
+  default_labels = {
+    delivery_type = "terraform"
+    environment   = "commit-dev"
+    git_repo      = "commit-hw"
+    owner         = "devops"
+    project       = "commit-hw-project-b"
+  }
+}
+
 ################################################################################
 # Kubernetes Provider Dynamic Configuration for GKE Data Queries
 ################################################################################
@@ -61,6 +94,11 @@ terraform {
     google = {
       source  = "hashicorp/google"
       version = ">= 6.0.0" # https://registry.terraform.io/providers/hashicorp/google/latest
+    }
+
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = ">= 6.0.0" # https://registry.terraform.io/providers/hashicorp/google-beta/latest
     }
 
     kubectl = {
