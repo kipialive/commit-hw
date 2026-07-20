@@ -10,8 +10,8 @@ name: Installation Uptime Kuma to GKE
 on:
   push:
     branches:
-      # - never-trigger-this-branch
-      - main
+      - never-trigger-this-branch
+      # - main
     paths:
       - ".github/helm-charts/env-dev/uptime-kuma/**"
       - ".github/workflows/env-dev--installation-uptime-kuma.yaml"

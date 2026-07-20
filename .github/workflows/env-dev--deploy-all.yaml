@@ -1,0 +1,66 @@
+## .github/workflows/env-dev--deploy-all.yaml
+name: Deploy commit-dev Kubernetes Stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      gke_cluster_name:
+        description: "GKE Cluster Name"
+        required: true
+        type: string
+        default: "commit-dev-gke-cluster"
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+jobs:
+  sealed-secrets:
+    name: Install Sealed Secrets Controller
+    uses: ./.github/workflows/env-dev--installation-sealed-secrets-controller.yaml
+    secrets: inherit
+    with:
+      gke_cluster_name: ${{ inputs.gke_cluster_name }}
+
+  cert-manager:
+    name: Install Cert-Manager Resources
+    needs: sealed-secrets
+    uses: ./.github/workflows/env-dev--installation-cert-manager.yaml
+    secrets: inherit
+    with:
+      gke_cluster_name: ${{ inputs.gke_cluster_name }}
+
+  traefik:
+    name: Deploy Traefik Reverse Proxy
+    needs: cert-manager
+    uses: ./.github/workflows/env-dev--deploy-traefik-reverse-proxy.yaml
+    secrets: inherit
+    with:
+      gke_cluster_name: ${{ inputs.gke_cluster_name }}
+
+  commit-api:
+    name: Deploy Commit API
+    needs: traefik
+    uses: ./.github/workflows/env-dev--deploy-commit-api.yaml
+    secrets: inherit
+    with:
+      gke_cluster_name: ${{ inputs.gke_cluster_name }}
+
+  uptime-kuma:
+    name: Install Uptime Kuma
+    needs: traefik
+    uses: ./.github/workflows/env-dev--installation-uptime-kuma.yaml
+    secrets: inherit
+    with:
+      gke_cluster_name: ${{ inputs.gke_cluster_name }}
+
+  ingressroutes:
+    name: Deploy Traefik IngressRoutes
+    needs:
+      - commit-api
+      - uptime-kuma
+    uses: ./.github/workflows/env-dev--deploy-traefik-ingressroutes.yaml
+    secrets: inherit
+    with:
+      gke_cluster_name: ${{ inputs.gke_cluster_name }}
